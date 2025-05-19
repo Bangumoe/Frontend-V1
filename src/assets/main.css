@@ -1,0 +1,63 @@
+@import './base.css';
+
+:root {
+  --bili-pink: #fb7299;
+  --bili-pink-light: #ffcce0;
+  --bili-blue: #00a1d6;
+  --bili-text-main: #18191c;
+  --bili-text-secondary: #505050;
+  --bili-text-light: #9499a0;
+  --bili-bg-light: #ffffff;
+  --bili-bg-gray: #f1f2f3;
+  --bili-bg-hover: #e5e9ef;
+  --bili-border-color: #e3e5e7;
+  --bili-player-bg: #000000;
+  --bili-skeleton-bg: #e0e0e0;
+  --player-accent-color: #00a1d6; /* Bilibili blue */
+  --player-text-color: #e0e0e0;
+  --controls-bg-color: rgb(26, 26, 26); /* MODIFIED: Fully opaque for maximum visibility */
+  --progress-track-color: rgba(255, 255, 255, 0.4); /* MODIFIED: More visible track */
+  --progress-fill-color: var(--player-accent-color);
+  --volume-track-color: rgba(255, 255, 255, 0.4); /* MODIFIED: More visible track for volume as well */
+  --volume-fill-color: #fff; /* White for volume fill */
+  --panel-bg-color: rgb(30, 30, 30);   /* MODIFIED: Fully opaque for maximum visibility */
+  --icon-fill-color: #fff;
+  --button-hover-bg: rgba(255, 255, 255, 0.15);
+  --panel-border-color: rgba(80, 80, 80, 0.7);
+  --item-hover-bg: rgba(255, 255, 255, 0.1);
+  --item-active-bg: var(--player-accent-color);
+  --player-accent-color: #00a1d6; 
+  --player-text-color: #e0e0e0;
+  --controls-bg-color: rgb(26, 26, 26); 
+  --progress-track-color: rgba(255, 255, 255, 0.4); 
+  --progress-fill-color: var(--player-accent-color);
+  --volume-track-color: rgba(255, 255, 255, 0.4); 
+  --volume-fill-color: #fff; 
+  --icon-fill-color: #fff;
+  --button-hover-bg: rgba(255, 255, 255, 0.15);
+  --panel-bg-color: rgb(30, 30, 30);   
+  --panel-border-color: rgba(80, 80, 80, 0.7);
+  --item-hover-bg: rgba(255, 255, 255, 0.1);
+  --item-active-bg: var(--player-accent-color);
+  --bottom-controls-height: 45px; /* Define height for bottom bar */
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
