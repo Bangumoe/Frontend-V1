@@ -191,7 +191,7 @@ const scrollRight = () => {
         >
           <div class="poster-container" :ref="el => { if (el) posterRefs[index] = el as HTMLElement }">
             <img
-              :src="dynamicPosterUrls[bangumi.ID] || getPosterUrl(bangumi.poster_link)"
+              :src="dynamicPosterUrls[bangumi.ID]"
               :alt="bangumi.official_title"
               class="poster"
               @error="(e: Event) => (e.target as HTMLImageElement).src = '/default-poster.png'"

@@ -34,6 +34,21 @@ interface UserInfo {
   role: string
   created_at: string
   updated_at: string
+  favorite_count: number
+  comment_count: number
+}
+
+interface UpdateUserInfoData {
+  email?: string
+  avatar?: File
+  old_password?: string
+  new_password?: string
+}
+
+interface UpdateUserInfoResponse {
+  success: boolean
+  message?: string
+  data?: UserInfo
 }
 
 export const authApi = {
@@ -168,7 +183,7 @@ export const authApi = {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/check`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/user/info`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -213,7 +228,48 @@ export const authApi = {
     } else if (currentRouteName === 'register') {
       console.log('Token expired while on register page. No auto-redirect to login.')
     }
-  }
+  },
+
+  updateUserInfo: async (data: UpdateUserInfoData): Promise<UpdateUserInfoResponse> => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('未登录')
+      }
+
+      const formData = new FormData()
+      if (data.email) formData.append('email', data.email)
+      if (data.avatar) formData.append('avatar', data.avatar)
+      if (data.old_password) formData.append('old_password', data.old_password)
+      if (data.new_password) formData.append('new_password', data.new_password)
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/user/info`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || '更新用户信息失败')
+      }
+
+      return {
+        success: true,
+        message: '更新成功',
+        data: result.data
+      }
+    } catch (error) {
+      console.error('更新用户信息错误:', error)
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : '网络错误'
+      }
+    }
+  },
 }
 
 // 应用启动时，确保 _isAuthenticated 与 localStorage 同步一次

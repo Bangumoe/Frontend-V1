@@ -180,9 +180,9 @@ const handleSearchEnter = (e: KeyboardEvent) => {
                 <User v-else theme="outline" size="20" fill="#666"/> 
               </div>
               <div v-show="showUserMenu" class="dropdown-menu" @mouseenter="openMenu" @mouseleave="startHideMenuTimer">
-                <RouterLink to="/user/profile" class="menu-item">
+                <RouterLink to="/space" class="menu-item">
                   <User theme="outline" size="16" class="menu-icon-park"/>
-                  <span>个人资料</span>
+                  <span>个人空间</span>
                 </RouterLink>
                 <button class="menu-item" @click="handleLogout">
                   <Logout theme="outline" size="16" class="menu-icon-park"/>

@@ -23,6 +23,12 @@
       </div>
     </section>
 
+    <StatusHint v-if="loading" type="loading" title="少女祈祷中..." sub="正在加载番剧列表，请稍候" />
+    <StatusHint v-else-if="error" type="error" :title="'加载失败'" :sub="error">
+      <button @click="fetchAnimeList(undefined, true)">重试</button>
+    </StatusHint>
+    <StatusHint v-else-if="animeList.length === 0 && !loading && !error" type="empty" title="暂无番剧" sub="没有找到任何番剧~" />
+
     <!-- 番剧列表组件 -->
     <AnimeGrid
       :animeList="animeList"
@@ -45,6 +51,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { bangumiApi } from '@/api/bangumi'
 import { useRoute, useRouter } from 'vue-router'
 import AnimeGrid from '@/components/AnimeGrid.vue'
+import StatusHint from '@/components/StatusHint.vue'
 
 interface Bangumi {
   ID: number

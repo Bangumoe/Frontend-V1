@@ -1,21 +1,11 @@
 <template>
   <div class="ranking-view">
     <h1 class="page-title">番剧综合排行榜</h1>
-
-    <div v-if="isLoading" class="loading-state">
-      <p>正在加载排行榜数据...</p>
-      <!-- 可以添加一个加载动画 -->
-    </div>
-
-    <div v-if="error" class="error-state">
-      <p class="error-message">加载失败：{{ error }}</p>
+    <StatusHint v-if="isLoading" type="loading" title="排行榜加载中..." sub="正在加载排行榜数据，请稍候" />
+    <StatusHint v-if="error" type="error" :title="'加载失败'" :sub="error">
       <button @click="fetchRankings">重试</button>
-    </div>
-
-    <div v-if="!isLoading && !error && rankings.length === 0" class="empty-state">
-      <p>暂无番剧排名数据。</p>
-    </div>
-
+    </StatusHint>
+    <StatusHint v-if="!isLoading && !error && rankings.length === 0" type="empty" title="暂无排行榜数据" sub="暂无番剧排名数据。" />
     <div v-if="!isLoading && !error && rankings.length > 0" class="ranking-list-container">
       <ul class="ranking-list">
         <li v-for="(bangumi, index) in rankings" :key="bangumi.ID" class="ranking-item">

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import TorrentPlayer from '@/components/TorrentPlayer.vue'
+import StatusHint from '@/components/StatusHint.vue'
 
 // TypeScript 接口定义 - 剧集列表相关
 interface Episode {
@@ -47,6 +48,21 @@ interface BangumiDetailApiResponse { // (NEW)
   data: BangumiDetail | null;
 }
 
+// 新增：番剧统计信息接口
+interface BangumiStats {
+  favorite_count: number;
+  is_favorite: boolean;
+  rating_avg: number;
+  rating_count: number;
+  view_count: number;
+}
+
+interface BangumiStatsApiResponse {
+  code: number;
+  message: string;
+  data: BangumiStats;
+}
+
 const route = useRoute()
 const bangumiId = ref<string | null>(null)
 const bangumiMainTitle = ref<string>('番剧标题加载中...')
@@ -60,6 +76,11 @@ const episodesError = ref<string | null>(null) // RENAMED from: const error = re
 const bangumiDetails = ref<BangumiDetail | null>(null)
 const detailsLoading = ref(false)
 const detailsError = ref<string | null>(null)
+
+// 新增：番剧统计信息状态
+const bangumiStats = ref<BangumiStats | null>(null)
+const statsLoading = ref(false)
+const statsError = ref<string | null>(null)
 
 const selectedGroup = ref<GroupedEpisode | null>(null)
 const selectedEpisode = ref<Episode | null>(null)
@@ -178,16 +199,42 @@ const fetchBangumiDetails = async (id: string) => {
   }
 };
 
+// 新增：获取番剧统计信息
+const fetchBangumiStats = async (id: string) => {
+  statsLoading.value = true;
+  statsError.value = null;
+  try {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await axios.get<BangumiStatsApiResponse>(`/api/v1/bangumi/${id}/stats`, { headers });
+    if (response.data.code === 200 && response.data.data) {
+      bangumiStats.value = response.data.data;
+    } else {
+      throw new Error(response.data.message || '获取番剧统计信息失败');
+    }
+  } catch (err) {
+    console.error('获取番剧统计信息时出错:', err);
+    statsError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    statsLoading.value = false;
+  }
+};
+
 onMounted(() => {
   const idFromRoute = route.params.id
   if (typeof idFromRoute === 'string') {
     bangumiId.value = idFromRoute
     fetchBangumiData(idFromRoute)
     fetchBangumiDetails(idFromRoute)
+    fetchBangumiStats(idFromRoute) // 新增：获取统计信息
   } else {
     const invalidIdMsg = "番剧ID无效";
     episodesError.value = `${invalidIdMsg} (剧集)`;
     detailsError.value = `${invalidIdMsg} (详情)`;
+    statsError.value = `${invalidIdMsg} (统计)`;
     bangumiMainTitle.value = invalidIdMsg;
   }
 })
@@ -277,18 +324,11 @@ const pageInitialLoading = computed(() => {
 <template>
   <div class="bangumi-player-page">
     <!-- Page Level Loading/Error/Empty States -->
-    <div v-if="pageInitialLoading && !episodesError && !detailsError" class="page-loading-state">
-      <p>少女祈祷中...</p>
-    </div>
-    <div v-else-if="(episodesError || detailsError) && (!groupedEpisodesData.length && !bangumiDetails)" class="page-error-state">
-      <p>加载番剧信息失败</p>
-      <p v-if="episodesError && !groupedEpisodesData.length">剧集列表错误: {{ episodesError }}</p>
-      <p v-if="detailsError && !bangumiDetails">番剧详情错误: {{ detailsError }}</p>
-      <p>请检查网络连接或番剧ID是否正确。</p>
-    </div>
-    <div v-else-if="!pageInitialLoading && !groupedEpisodesData.length && !bangumiDetails && !episodesError && !detailsError" class="page-empty-state">
-      <p>Σ( ° △ °|||)︴ 抱歉，该番剧暂无任何信息~</p>
-    </div>
+    <StatusHint v-if="pageInitialLoading && !episodesError && !detailsError" type="loading" title="少女祈祷中..." sub="正在加载番剧资源，请稍候" />
+    <StatusHint v-else-if="(episodesError || detailsError) && (!groupedEpisodesData.length && !bangumiDetails)" type="error" :title="'加载失败'" :sub="episodesError || detailsError">
+      <div class="status-sub">请检查网络连接或番剧ID是否正确。</div>
+    </StatusHint>
+    <StatusHint v-else-if="!pageInitialLoading && !groupedEpisodesData.length && !bangumiDetails && !episodesError && !detailsError" type="empty" title="暂无番剧信息" sub="抱歉，该番剧暂无任何信息~" />
 
     <div v-else class="player-layout-wrapper">
       <main class="main-content-area">

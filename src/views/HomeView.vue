@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, reactive, onUnmounted, watch } from 'vue'
 import Carousel from '@/components/Carousel.vue'
 import HomePopular from '@/components/HomePopular.vue'
 import { bangumiApi } from '@/api/bangumi'
 import axios from 'axios'
+import { authApi } from '@/api/auth'
+import { useRouter } from 'vue-router'
+import StatusHint from '@/components/StatusHint.vue'
 
 // 轮播图数据
 const carouselItems = ref<{
@@ -46,9 +49,94 @@ const fetchYears = async () => {
   }
 }
 
+// 我追的番剧（收藏）
+const myBangumis = ref<any[]>([])
+const myLoading = ref(false)
+const myError = ref('')
+const router = useRouter()
+// 用对象存储每个 bangumi.id 的 poster 容器 ref
+const myPosterRefs = ref<{ [key: number]: HTMLElement | null }>({})
+// 用 reactive 对象存储每个 bangumi.id 的动态图片 URL
+const myPosterUrls = reactive<{ [key: number]: string }>({})
+
+const fetchMyBangumis = async () => {
+  myLoading.value = true
+  myError.value = ''
+  myBangumis.value = []
+  try {
+    const token = authApi.getToken && authApi.getToken()
+    if (!token) {
+      myError.value = '请先登录后查看';
+      return
+    }
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+    const res = await fetch(`${API_BASE_URL}/api/v1/user/favorites?page=1&page_size=20`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    const list = data.data?.list
+    if (Array.isArray(list)) {
+      myBangumis.value = list
+      myError.value = ''
+      nextTick(() => updateAllMyPosterUrls())
+    } else {
+      myError.value = data.message || '获取收藏失败'
+    }
+  } catch (e) {
+    myError.value = '网络错误，请稍后重试'
+  } finally {
+    myLoading.value = false
+  }
+}
+
+const getMyPosterUrl = (cover: string) => {
+  if (!cover) return '/default-poster.png';
+  if (/^https?:\/\//.test(cover)) return cover;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const cleanPath = cover.replace(/^\/+/, '');
+  return `${baseUrl}/api/v1/images/${cleanPath}`;
+}
+
+const setMyPosterRef = (el: HTMLElement | null, bangumi: any) => {
+  if (el) {
+    myPosterRefs.value[bangumi.id] = el
+    updateMyPosterUrl(bangumi)
+  }
+}
+
+const updateMyPosterUrl = (bangumi: any) => {
+  const el = myPosterRefs.value[bangumi.id]
+  if (el) {
+    const width = el.offsetWidth
+    const height = el.offsetHeight
+    const baseUrl = getMyPosterUrl(bangumi.cover)
+    if (baseUrl) {
+      myPosterUrls[bangumi.id] = `${baseUrl}?width=${width}&height=${height}&format=webp`
+    }
+  }
+}
+
+const updateAllMyPosterUrls = () => {
+  nextTick(() => {
+    myBangumis.value.forEach(bangumi => {
+      updateMyPosterUrl(bangumi)
+    })
+  })
+}
+
 onMounted(() => {
   fetchCarousels()
   fetchYears()
+  fetchMyBangumis()
+  window.addEventListener('resize', updateAllMyPosterUrls)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateAllMyPosterUrls)
+})
+
+watch(myBangumis, () => {
+  nextTick(updateAllMyPosterUrls)
 })
 </script>
 
@@ -57,6 +145,59 @@ onMounted(() => {
     <!-- 轮播图区域 -->
     <section class="carousel-section">
       <Carousel :items="carouselItems" />
+    </section>
+
+    <!-- 我追的番剧 -->
+    <section class="my-bangumi-section">
+      <div class="section-header">
+        <h2 class="section-title">我追的番剧</h2>
+        <router-link to="/space" class="view-more">全部
+          <Right />
+        </router-link>
+      </div>
+      <div v-if="myLoading" class="my-bangumi-status"><StatusHint type="loading" title="加载中..." sub="正在加载我的收藏" /></div>
+      <div v-else-if="myError" class="my-bangumi-status"><StatusHint type="empty" :title="myError" /></div>
+      <div v-else-if="myBangumis.length === 0" class="my-bangumi-status"><StatusHint type="empty" title="暂无收藏" sub="你还没有追番，快去收藏喜欢的番剧吧~" /></div>
+      <div v-else class="my-bangumi-scroll">
+        <div class="my-bangumi-list">
+          <router-link v-for="bangumi in myBangumis" :key="bangumi.id" :to="`/v2/bangumi/${bangumi.id}`" class="my-bangumi-card bangumi-card">
+            <div class="my-bangumi-poster-container bangumi-cover" :ref="el => setMyPosterRef(el, bangumi)">
+              <img
+                :src="myPosterUrls[bangumi.id] || '/default-poster.png'"
+                :alt="bangumi.title"
+                class="my-bangumi-poster"
+                @error="(e) => { (e.target as HTMLImageElement).src = '/default-poster.png' }"
+              />
+              <div class="hover-info">
+                <button class="play-btn">
+                  <play-one theme="filled" size="30" fill="#333"/>
+                </button>
+              </div>
+            </div>
+            <div class="bangumi-info">
+              <h3 class="title">{{ bangumi.title }}</h3>
+              <div class="meta-info">
+                <span class="year">{{ bangumi.year }}</span>
+                <span class="season">第{{ bangumi.season }}季</span>
+              </div>
+              <div class="stats">
+                <div class="stat-item rating" v-if="bangumi.rating_avg > 0">
+                  <Star />
+                  <span>{{ bangumi.rating_avg?.toFixed(1) }}</span>
+                </div>
+                <div class="stat-item views">
+                  <play theme="filled" fill="#333"/>
+                  <span>{{ bangumi.view_count }}</span>
+                </div>
+                <div class="stat-item favorites">
+                  <Like />
+                  <span>{{ bangumi.favorite_count }}</span>
+                </div>
+              </div>
+            </div>
+          </router-link>
+        </div>
+      </div>
     </section>
 
     <!-- 年份浏览 -->
@@ -100,6 +241,20 @@ onMounted(() => {
   margin: 0 auto;
   padding: 24px;
   width: 100%;
+}
+
+.bangumi-card {
+  flex: 0 0 200px; /* Prevent shrinking, set base width */
+  width: 200px; /* Explicit width */
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  color: inherit;
+  transform: translateZ(0);
+  will-change: transform, box-shadow;
 }
 
 .section-header {
@@ -353,6 +508,170 @@ onMounted(() => {
 
   .year-number {
     font-size: 20px;
+  }
+}
+
+.my-bangumi-section {
+  margin-bottom: 48px;
+  width: 100%;
+}
+
+.my-bangumi-status {
+  min-height: 120px;
+}
+
+.my-bangumi-scroll {
+  overflow-x: auto;
+  width: 100%;
+  padding-bottom: 8px;
+}
+
+.my-bangumi-list {
+  display: flex;
+  gap: 24px;
+  min-width: 100%;
+  padding: 8px 0;
+}
+
+.my-bangumi-card.bangumi-card {
+  flex: 0 0 200px;
+  width: 200px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  color: inherit;
+  transform: translateZ(0);
+  will-change: transform, box-shadow;
+}
+
+.my-bangumi-card.bangumi-card:hover {
+  transform: translateY(-4px) translateZ(0);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.my-bangumi-poster-container.bangumi-cover {
+  position: relative;
+  padding-top: 140%;
+  overflow: hidden;
+  background-color: #f0f0f0;
+}
+
+.my-bangumi-poster {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  animation: imageFadeIn 0.3s ease-in-out;
+}
+
+.hover-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.my-bangumi-card.bangumi-card:hover .hover-info {
+  opacity: 1;
+}
+
+.my-bangumi-card.bangumi-card:hover .my-bangumi-poster {
+  transform: scale(1.05) translateZ(0);
+}
+
+.play-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s;
+}
+
+.play-btn:hover {
+  transform: scale(1.1);
+}
+
+.bangumi-info {
+  padding: 12px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-color);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+  height: 2.8em;
+}
+
+.meta-info {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-item.rating {
+  color: #ffb800;
+}
+
+@media (max-width: 768px) {
+  .my-bangumi-card.bangumi-card {
+    flex: 0 0 140px;
+    width: 140px;
+  }
+  
+  .title {
+    font-size: 13px;
+  }
+
+  .meta-info,
+  .stats {
+    font-size: 11px;
   }
 }
 </style>
