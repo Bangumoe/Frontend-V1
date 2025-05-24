@@ -1,14 +1,27 @@
 <template>
 <div class="player-view-v2-page" :style="{ backgroundColor: pageStyle.backgroundColor }">
-  <div v-if="pageInitialLoading" class="page-status-fullscreen">
-    <p>少女祈祷中...</p>
+  <!-- 状态提示美化 -->
+  <div v-if="pageInitialLoading" class="page-status-fullscreen status-loading">
+    <div class="status-icon loading-spinner"></div>
+    <div class="status-texts">
+      <div class="status-title">少女祈祷中...</div>
+      <div class="status-sub">正在加载番剧资源，请稍候</div>
+    </div>
   </div>
-  <div v-else-if="pageError" class="page-status-fullscreen error">
-    <p>{{ pageError }}</p>
-    <p>请检查网络或番剧ID是否正确。</p>
+  <div v-else-if="pageError" class="page-status-fullscreen status-error">
+    <div class="status-icon error-icon">(╯°□°）╯︵ ┻━┻</div>
+    <div class="status-texts">
+      <div class="status-title">加载失败</div>
+      <div class="status-sub">{{ pageError }}</div>
+      <div class="status-sub">请检查网络或番剧ID是否正确。</div>
+    </div>
   </div>
-  <div v-else-if="!bangumiDetails && !groupedEpisodesData.length" class="page-status-fullscreen">
-    <p>Σ( ° △ °|||)︴ 抱歉，该番剧暂无任何信息~</p>
+  <div v-else-if="!bangumiDetails && !groupedEpisodesData.length" class="page-status-fullscreen status-empty">
+    <div class="status-icon empty-icon">Σ( ° △ °|||)︴</div>
+    <div class="status-texts">
+      <div class="status-title">暂无番剧信息</div>
+      <div class="status-sub">抱歉，该番剧暂无任何信息~</div>
+    </div>
   </div>
 
     <div v-else :class="['player-layout-container', { 'fullscreen-mode': isPlayerFullscreen || isPlayerWebFullscreen }]">
@@ -40,10 +53,14 @@
               <div class="playback-stats">
                 <span class="stat-item">
                   <Play theme="outline" size="14" fill="#61666d" class="stat-icon"/>
-                  {{ formatCount(bangumiDetails.view_count) }}
+                  {{ formatCount(bangumiStats?.view_count) }}
                 </span>
-                <span class="stat-item rating-stat" :title="bangumiDetails.rating_count > 0 ? `${bangumiDetails.rating_count}人评价` : '暂无评价'">
-                  <template v-if="bangumiDetails.rating_count > 0 && bangumiDetails.rating_avg > 0">
+                <span class="stat-item">
+                  <Like theme="outline" size="14" fill="#61666d" class="stat-icon"/>
+                  {{ formatCount(bangumiStats?.favorite_count) }}
+                </span>
+                <span class="stat-item rating-stat" :title="ratingInfo.count > 0 ? `${ratingInfo.count}人评价` : '暂无评价'">
+                  <template v-if="ratingInfo.hasRating">
                     <template v-for="i in 5" :key="`star-rating-${i}`">
                       <Star v-if="i <= roundedStarRating" theme="filled" size="14" fill="#ffc107" class="stat-icon star-icon"/>
                       <Star v-else theme="outline" size="14" fill="#e0e0e0" class="stat-icon star-icon empty-star-color"/>
@@ -52,7 +69,7 @@
                   <template v-else>
                     <Star v-for="i in 5" :key="`star-empty-${i}`" theme="outline" size="14" fill="#e0e0e0" class="stat-icon star-icon empty-star-color"/>
                   </template>
-                  <span class="rating-text">{{ (bangumiDetails.rating_count > 0 && bangumiDetails.rating_avg > 0) ? bangumiDetails.rating_avg.toFixed(1) : '暂无评分' }}</span>
+                  <span class="rating-text">{{ ratingInfo.hasRating ? ratingInfo.avg.toFixed(1) : '暂无评分' }}</span>
                 </span>
               </div>
             </div>
@@ -125,9 +142,13 @@
               <span>来源: {{ bangumiDetails.source }}</span>
             </div>
             <div class="action-buttons">
-              <button class="action-btn favorite-btn">
-                <Heart theme="outline" size="16" class="btn-icon"/>
-                追番
+              <button 
+                class="action-btn favorite-btn" 
+                :class="{ 'favorited': bangumiStats?.is_favorite }"
+                @click="toggleFavorite"
+              >
+                <Like :theme="bangumiStats?.is_favorite ? 'filled' : 'outline'" size="16" class="btn-icon"/>
+                {{ bangumiStats?.is_favorite ? '已收藏' : '收藏' }}
               </button>
               <button class="action-btn channel-btn">番剧频道</button>
             </div>
@@ -279,6 +300,25 @@ interface BangumiDetailApiResponse {
   data: BangumiDetail | null;
 }
 
+interface BangumiStats {
+  favorite_count: number;
+  is_favorite: boolean;
+  rating_avg: number;
+  rating_count: number;
+  view_count: number;
+}
+
+interface BangumiStatsApiResponse {
+  code: number;
+  message: string;
+  data: BangumiStats;
+}
+
+interface BangumiFavoriteApiResponse {
+  code: number;
+  message: string;
+}
+
 // --- Component State ---
 const route = useRoute()
 const bangumiId = ref<string | null>(null)
@@ -288,6 +328,11 @@ const bangumiDetails = ref<BangumiDetail | null>(null)
 const detailsLoading = ref(false)
 const detailsError = ref<string | null>(null)
 
+// 番剧统计信息
+const bangumiStats = ref<BangumiStats | null>(null)
+const statsLoading = ref(false)
+const statsError = ref<string | null>(null)
+
 // 剧集列表
 const groupedEpisodesData = ref<GroupedEpisode[]>([])
 const episodesLoading = ref(false)
@@ -295,10 +340,10 @@ const episodesError = ref<string | null>(null)
 
 // 用户选择
 const selectedGroup = ref<GroupedEpisode | null>(null)
-const selectedResolution = ref<Resolution | null>(null) // 新增：选中的分辨率
-const selectedSubGroup = ref<SubGroup | null>(null) // 新增：选中的子类型
+const selectedResolution = ref<Resolution | null>(null)
+const selectedSubGroup = ref<SubGroup | null>(null)
 const selectedEpisode = ref<Episode | null>(null)
-const activeTorrentUrl = ref<string>('') // URL for TorrentPlayer
+const activeTorrentUrl = ref<string>('')
 
 // 新增：播放器全屏状态
 const isPlayerFullscreen = ref(false)
@@ -313,12 +358,14 @@ const handlePlayerWebFullscreenChange = (val: boolean) => {
 // --- Loading/Error States for UI ---
 const pageInitialLoading = computed(() => {
   return (episodesLoading.value && groupedEpisodesData.value.length === 0) ||
-         (detailsLoading.value && !bangumiDetails.value);
+         (detailsLoading.value && !bangumiDetails.value) ||
+         (statsLoading.value && !bangumiStats.value);
 });
 
 const pageError = computed(() => {
     if (episodesError.value && groupedEpisodesData.value.length === 0 && !bangumiDetails.value) return `剧集列表加载失败: ${episodesError.value}`;
     if (detailsError.value && !bangumiDetails.value && !groupedEpisodesData.value.length) return `番剧详情加载失败: ${detailsError.value}`;
+    if (statsError.value && !bangumiStats.value) return `番剧统计信息加载失败: ${statsError.value}`;
     if (episodesError.value && detailsError.value) return "番剧信息和剧集列表加载均失败。";
     return null;
 });
@@ -369,9 +416,25 @@ const fetchBangumiDetails = async (id: string) => {
     } else {
       throw new Error(response.data.message || '获取番剧详情失败');
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('获取番剧详情时出错:', err);
-    detailsError.value = err instanceof Error ? err.message : String(err);
+    if (err.response) {
+      switch (err.response.status) {
+        case 404:
+          detailsError.value = "番剧不存在。";
+          break;
+        case 403:
+          detailsError.value = "您没有权限访问此番剧。";
+          break;
+        case 401:
+          detailsError.value = "请先登录。";
+          break;
+        default:
+          detailsError.value = err.response.data?.message || '获取番剧详情失败';
+      }
+    } else {
+      detailsError.value = err instanceof Error ? err.message : String(err);
+    }
   } finally {
     detailsLoading.value = false;
   }
@@ -387,16 +450,100 @@ const fetchGroupedEpisodes = async (id: string) => {
     if (response.data.code === 200 && response.data.data) {
       groupedEpisodesData.value = response.data.data;
       if (groupedEpisodesData.value.length > 0 && !selectedGroup.value) {
-        selectedGroup.value = groupedEpisodesData.value[0]; // 默认选中第一个字幕组
+        selectedGroup.value = groupedEpisodesData.value[0];
       }
     } else {
       throw new Error(response.data.message || '获取剧集列表失败');
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('获取剧集列表时出错:', err);
-    episodesError.value = err instanceof Error ? err.message : String(err);
+    if (err.response) {
+      switch (err.response.status) {
+        case 404:
+          episodesError.value = "番剧不存在。";
+          break;
+        case 403:
+          episodesError.value = "您没有权限访问此番剧。";
+          break;
+        case 401:
+          episodesError.value = "请先登录。";
+          break;
+        default:
+          episodesError.value = err.response.data?.message || '获取剧集列表失败';
+      }
+    } else {
+      episodesError.value = err instanceof Error ? err.message : String(err);
+    }
   } finally {
     episodesLoading.value = false;
+  }
+};
+
+const fetchBangumiStats = async (id: string) => {
+  statsLoading.value = true;
+  statsError.value = null;
+  try {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const response = await axios.get<BangumiStatsApiResponse>(`/api/v1/bangumi/${id}/stats`, { headers });
+    if (response.data.code === 200 && response.data.data) {
+      bangumiStats.value = response.data.data;
+    } else {
+      throw new Error(response.data.message || '获取番剧统计信息失败');
+    }
+  } catch (err: any) {
+    console.error('获取番剧统计信息时出错:', err);
+    if (err.response) {
+      switch (err.response.status) {
+        case 404:
+          statsError.value = "番剧不存在。";
+          break;
+        case 403:
+          statsError.value = "您没有权限访问此番剧。";
+          break;
+        case 401:
+          statsError.value = "请先登录。";
+          break;
+        default:
+          statsError.value = err.response.data?.message || '获取番剧统计信息失败';
+      }
+    } else {
+      statsError.value = err instanceof Error ? err.message : String(err);
+    }
+  } finally {
+    statsLoading.value = false;
+  }
+};
+
+const toggleFavorite = async () => {
+  if (!bangumiId.value) return;
+  
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // 如果用户未登录，可以在这里添加提示或跳转到登录页面
+      return;
+    }
+    
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const response = await axios.post<BangumiFavoriteApiResponse>(
+      `/api/v1/bangumi/${bangumiId.value}/favorite`,
+      {},
+      { headers }
+    );
+    
+    if (response.data.code === 200) {
+      // 更新本地状态
+      if (bangumiStats.value) {
+        bangumiStats.value.is_favorite = !bangumiStats.value.is_favorite;
+        bangumiStats.value.favorite_count += bangumiStats.value.is_favorite ? 1 : -1;
+      }
+    } else {
+      throw new Error(response.data.message || '操作失败');
+    }
+  } catch (err) {
+    console.error('收藏/取消收藏操作失败:', err);
+    // 可以在这里添加错误提示
   }
 };
 
@@ -438,9 +585,15 @@ const synopsisText = computed(() => {
     return `${title} (${year}${season ? ` ${season}` : ''}) 是一部广受欢迎的作品。当前暂无更详细的剧情摘要。本资源信息主要来源于${source}。请欣赏视频内容。`;
 });
 
+const ratingInfo = computed(() => ({
+  count: bangumiStats.value?.rating_count ?? 0,
+  avg: bangumiStats.value?.rating_avg ?? 0,
+  hasRating: (bangumiStats.value?.rating_count ?? 0) > 0 && (bangumiStats.value?.rating_avg ?? 0) > 0
+}));
+
 const roundedStarRating = computed(() => {
-  if (bangumiDetails.value && bangumiDetails.value.rating_avg > 0 && bangumiDetails.value.rating_count > 0) {
-    return Math.round(bangumiDetails.value.rating_avg / 2);
+  if (ratingInfo.value.hasRating) {
+    return Math.round(ratingInfo.value.avg / 2);
   }
   return 0;
 });
@@ -540,10 +693,12 @@ const initializeFromRoute = () => {
     bangumiId.value = idFromRoute;
     fetchBangumiDetails(idFromRoute);
     fetchGroupedEpisodes(idFromRoute);
+    fetchBangumiStats(idFromRoute);
   } else {
     const invalidIdMsg = "番剧ID无效";
     episodesError.value = invalidIdMsg;
     detailsError.value = invalidIdMsg;
+    statsError.value = invalidIdMsg;
   }
 };
 
@@ -831,6 +986,11 @@ watch(() => route.params.id, (newId) => {
   color: white;
 }
 .favorite-btn:hover { background-color: #e0688a; }
+.favorite-btn.favorited {
+  background-color: #e7e7e7; /* Darker red for favorited state */
+  color: #333;
+}
+.favorite-btn.favorited:hover { background-color: #ff6b81; }
 .channel-btn {
   background-color: #f1f2f3; /* Light grey */
   color: #333;
@@ -1073,6 +1233,101 @@ watch(() => route.params.id, (newId) => {
   fill: currentColor; /* Inherits color from button text (white) */
   display: inline-flex; /* Helps with alignment */
   align-items: center;
+}
+
+.page-status-fullscreen {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+  background: none;
+  color: #61666d;
+  font-size: 18px;
+  animation: fadeIn 0.6s;
+}
+
+.status-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.loading-spinner {
+  width: 56px;
+  height: 56px;
+  border: 6px solid #fb7299;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 8px auto;
+  background: linear-gradient(135deg, #fb7299 60%, #ffd6e3 100%);
+  box-shadow: 0 2px 12px rgba(251,114,153,0.12);
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.status-error .error-icon {
+  color: #ff4d4f;
+  font-size: 54px;
+  animation: shake 0.7s;
+}
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+.status-empty .empty-icon {
+  color: #bdbdbd;
+  font-size: 54px;
+  animation: bounceIn 0.7s;
+}
+@keyframes bounceIn {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.status-title {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #18191c;
+  margin-bottom: 4px;
+}
+.status-sub {
+  font-size: 1em;
+  color: #888;
+  margin-bottom: 2px;
+}
+.status-texts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .page-status-fullscreen {
+    font-size: 15px;
+    gap: 12px;
+  }
+  .status-icon {
+    font-size: 36px;
+  }
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border-width: 4px;
+  }
+  .status-title {
+    font-size: 1.1em;
+  }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 </style>

@@ -9,6 +9,8 @@ import UserProfile from "@/views/UserProfile.vue";
 import RankingView from "@/views/RankingView.vue";
 import BangumiPlayer from "@/views/BangumiPlayer.vue";
 import PlayerViewV2 from "@/views/PlayerView-V2.vue";
+import UserFavorites from "@/views/UserFavorites.vue";
+import UserSpace from "@/views/UserSpace.vue";
 import { useBetaStore } from '@/stores/beta'
 import SearchView from "@/views/SearchView.vue";
 
@@ -56,7 +58,21 @@ const routes = [
     path: '/user/profile',
     name: 'user-profile',
     component: UserProfile,
-    meta: { title: '用户中心' + '   |   ' + title  }
+    meta: { title: '用户中心' + '   |   ' + title  },
+    children: [
+      {
+        path: 'favorites',
+        name: 'userFavorites',
+        component: UserFavorites,
+        meta: { title: '我的收藏' + '   |   ' + title }
+      },
+      {
+         path: '',
+         name: 'userProfileOverview',
+         component: { template: '<div>用户概览内容 (待添加)</div>' },
+         meta: { title: '用户概览' + '   |   ' + title }
+      }
+    ]
   },
   {
     path: '/torrent-test',
@@ -92,6 +108,15 @@ const routes = [
     name: 'search',
     component: SearchView,
     meta: { title: '搜索结果   |   咪次元~Bangumoe！' }
+  },
+  {
+    path: '/space',
+    name: 'user-space',
+    component: UserSpace,
+    meta: { 
+      title: '个人空间' + '   |   ' + title,
+      requiresAuth: true 
+    }
   }
 ];
 

@@ -3,7 +3,8 @@
     <el-result
       icon="warning"
       title="暂无内测资格"
-      sub-title="您当前没有内测资格，无法访问该网站"
+      sub-title="您当前没有内测资格，无法访问该网站；若您有测试资格，请先检查登陆状态！"
+      status="warning"
     >
       <template #extra>
         <el-button type="primary" @click="goBack">返回首页</el-button>
