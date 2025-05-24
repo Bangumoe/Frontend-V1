@@ -1,6 +1,8 @@
 import { authApi } from './auth';
 
-export const API_BASE_URL = import.meta.env.PROD ? 'http://localhost:8081' : ''
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+export const MIKAN_BASE_URL = import.meta.env.VITE_MIKAN_BASE_URL || ''
+export const TORRENT_API_BASE_URL = import.meta.env.VITE_TORRENT_API_BASE_URL || ''
 
 export interface ApiResponse<T> {
   code: number
