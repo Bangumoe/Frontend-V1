@@ -97,16 +97,18 @@ const getMyPosterUrl = (cover: string) => {
   return `${baseUrl}/api/v1/images/${cleanPath}`;
 }
 
-const setMyPosterRef = (el: HTMLElement | null, bangumi: any) => {
-  if (el) {
-    myPosterRefs.value[bangumi.id] = el
+import type { ComponentPublicInstance } from 'vue';
+
+const setMyPosterRef = (el: Element | ComponentPublicInstance | null, bangumi: any) => {
+  if (el && el instanceof HTMLElement) {
+    myPosterRefs.value[bangumi.id] = el as HTMLElement;
     updateMyPosterUrl(bangumi)
   }
 }
 
 const updateMyPosterUrl = (bangumi: any) => {
   const el = myPosterRefs.value[bangumi.id]
-  if (el) {
+  if (el && el instanceof HTMLElement) {
     const width = el.offsetWidth
     const height = el.offsetHeight
     const baseUrl = getMyPosterUrl(bangumi.cover)

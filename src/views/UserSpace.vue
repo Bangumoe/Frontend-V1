@@ -54,9 +54,11 @@ const route = useRoute();
 const posterUrls = reactive<{ [key: number]: string }>({});
 const posterRefs = ref<{ [key: number]: HTMLElement | null }>({});
 
-const setPosterRef = (el: HTMLElement | null, bangumi: Bangumi) => {
-  if (el) {
-    posterRefs.value[bangumi.id] = el;
+import type { ComponentPublicInstance } from 'vue';
+
+const setPosterRef = (el: Element | ComponentPublicInstance | null, bangumi: Bangumi) => {
+  if (el && el instanceof HTMLElement) {
+    posterRefs.value[bangumi.id] = el as HTMLElement;
     // 当元素被设置时立即更新其 URL
     updatePosterUrl(bangumi);
   }
@@ -65,7 +67,7 @@ const setPosterRef = (el: HTMLElement | null, bangumi: Bangumi) => {
 // 更新单个海报的 URL
 const updatePosterUrl = (bangumi: Bangumi) => {
   const el = posterRefs.value[bangumi.id];
-  if (el) {
+  if (el && el instanceof HTMLElement) {
     const width = el.offsetWidth;
     const height = el.offsetHeight;
     const baseUrl = getPosterUrl(bangumi.cover);
@@ -1063,4 +1065,4 @@ const handleEditSubmit = async () => {
     padding: 12px 10px 8px 10px;
   }
 }
-</style> 
+</style>
