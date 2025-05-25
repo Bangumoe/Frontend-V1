@@ -27,19 +27,27 @@ interface Bangumi {
   favorite_at: string;
 }
 
-interface FavoritesResponse {
+interface History extends Bangumi {
+  episode: number;
+  history_id: number;
+  history_time: string;
+}
+
+interface ResultResponse<T> {
   data: {
     total: number;
     page: number;
     page_size: number;
     total_pages: number;
-    list: Bangumi[];
+    list: T[];
   }
 }
 
 const userInfo = ref<UserInfo | null>(null);
 const favoritesList = ref<Bangumi[]>([]);
 const loading = ref(false);
+const loadingD = ref(false)
+const historyList = ref<History[]>([]);
 const errorMsg = ref('');
 const pagination = ref({
   total: 0,
@@ -48,6 +56,12 @@ const pagination = ref({
   totalPages: 0
 });
 
+const paginationD = ref({
+  total: 0,
+  page: 1,
+  pageSize: 10,
+  totalPages: 0
+});
 const route = useRoute();
 
 // 添加动态海报URL的响应式对象
@@ -81,6 +95,13 @@ const updatePosterUrl = (bangumi: Bangumi) => {
 const updatePosterUrls = () => {
   nextTick(() => {
     favoritesList.value.forEach((bangumi) => {
+      updatePosterUrl(bangumi);
+    });
+  });
+};
+const updatePosterUrlsD = () => {
+  nextTick(() => {
+    historyList.value.forEach((bangumi) => {
       updatePosterUrl(bangumi);
     });
   });
@@ -138,7 +159,7 @@ const fetchFavorites = async () => {
         }
       }
     );
-    const result: FavoritesResponse = await response.json();
+    const result: ResultResponse<Bangumi> = await response.json();
     
     if (result.data) {
       favoritesList.value = result.data.list;
@@ -159,10 +180,72 @@ const handlePageChange = (page: number) => {
   pagination.value.page = page;
   fetchFavorites();
 };
+const handlePageChangeD = (page: number) => {
+  paginationD.value.page = page;
+  fetchPlayHistory();
+};
+
+const fetchPlayHistory = async () => {
+  loadingD.value = true;
+  try {
+    const token = authApi.getToken();
+    if (!token) {
+      throw new Error('未登录');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/history/play_history?page=${paginationD.value.page}&page_size=${paginationD.value.pageSize}`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    const result : ResultResponse<History> = await response.json();
+
+    if (result.data) {
+      historyList.value = result.data.list;
+      paginationD.value.total = result.data.total;
+      paginationD.value.page = result.data.page;
+      paginationD.value.pageSize = result.data.page_size;
+      paginationD.value.totalPages = result.data.total_pages;
+    }
+  } catch (error) {
+    errorMsg.value = '获取历史记录失败';
+    console.error('获取历史记录失败:', error);
+  } finally {
+    loadingD.value = false;
+  }
+};
+const formatDateToYYYYMMDD = (dateStr: string) => {
+  const date = new Date(dateStr)
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const inputDate = new Date(date);
+  const inputDay = new Date(inputDate.getFullYear(), inputDate.getMonth(), inputDate.getDate());
+
+  const hours = String(inputDate.getHours()).padStart(2, '0');
+  const minutes = String(inputDate.getMinutes()).padStart(2, '0');
+  const timePart = `${hours}:${minutes}`;
+
+  if (inputDay.getTime() === today.getTime()) {
+    return `今天 ${timePart}`;
+  } else if (inputDay.getTime() === yesterday.getTime()) {
+    return `昨天 ${timePart}`;
+  } else if (inputDate.getFullYear() === now.getFullYear()) {
+    const month = String(inputDate.getMonth() + 1).padStart(2, '0');
+    const day = String(inputDate.getDate()).padStart(2, '0');
+    return `${month}-${day} ${timePart}`;
+  } else {
+    const year = inputDate.getFullYear();
+    const month = String(inputDate.getMonth() + 1).padStart(2, '0');
+    const day = String(inputDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day} ${timePart}`;
+  }
+}
 
 onMounted(() => {
   fetchUserInfo();
   fetchFavorites();
+  fetchPlayHistory();
   window.addEventListener('resize', handleResize);
 });
 
@@ -173,6 +256,9 @@ onUnmounted(() => {
 // 监听收藏列表变化
 watch(favoritesList, () => {
   nextTick(updatePosterUrls);
+});
+watch(historyList, () => {
+  nextTick(updatePosterUrlsD);
 });
 
 // 添加编辑相关的状态
@@ -363,6 +449,74 @@ const handleEditSubmit = async () => {
       </div>
     </div>
 
+    <!-- 历史记录列表 -->
+    <div class="favorites-section margin-top-16">
+      <h2 class="section-title">历史记录</h2>
+
+      <!-- 加载状态 -->
+      <div v-if="loadingD" class="page-status">
+        <div class="loading-spinner"></div>
+        <p>少女祈祷中...</p>
+      </div>
+
+      <!-- 错误状态 -->
+      <div v-else-if="errorMsg" class="page-status error">
+        <p>{{ errorMsg }}</p>
+        <button class="retry-btn" @click="fetchPlayHistory">重试</button>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-else-if="historyList.length === 0" class="page-status empty">
+        <p>Σ( ° △ °|||)︴ 还没有播放过任何番剧哦~</p>
+      </div>
+
+      <!-- 正常状态 -->
+      <div v-else class="favorites-grid">
+        <div v-for="bangumi in historyList" :key="bangumi.id" class="bangumi-card">
+          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.url}`" class="bangumi-link">
+            <div class="bangumi-cover" :ref="el => setPosterRef(el, bangumi)">
+              <img :src="posterUrls[bangumi.id] || '/default-poster.png'" :alt="bangumi.title"
+                @error="(e: Event) => (e.target as HTMLImageElement).src = '/default-poster.png'" />
+              <div class="bangumi-hover-info">
+                <div class="hover-content">
+                  <span class="hover-title">{{ bangumi.title }}</span>
+                  <span class="hover-meta">第 {{ bangumi.episode }} 集</span>
+                  <span class="hover-meta"> 上次观看时间 </span>
+                  <span class="hover-meta"> {{ formatDateToYYYYMMDD(bangumi.history_time) }} </span>
+                </div>
+              </div>
+            </div>
+            <div class="bangumi-info">
+              <h3 class="bangumi-title">{{ bangumi.title }}</h3>
+              <p class="bangumi-meta">
+                {{ bangumi.year }}年 {{ bangumi.season }}
+              </p>
+              <p class="bangumi-meta">
+                第 {{ bangumi.episode }} 集
+              </p>
+              <p class="bangumi-meta">
+                上次观看时间 {{ formatDateToYYYYMMDD(bangumi.history_time) }}
+              </p>
+            </div>
+          </router-link>
+        </div>
+      </div>
+
+      <!-- 分页控件 -->
+      <div v-if="paginationD.totalPages > 1" class="pagination">
+        <button :disabled="paginationD.page <= 1" @click="handlePageChange(paginationD.page - 1)" class="page-btn">
+          上一页
+        </button>
+        <span class="page-info">
+          {{ paginationD.page }} / {{ paginationD.totalPages }}
+        </span>
+        <button :disabled="paginationD.page >= paginationD.totalPages" @click="handlePageChange(paginationD.page + 1)"
+          class="page-btn">
+          下一页
+        </button>
+      </div>
+    </div>
+
     <!-- 编辑弹窗 -->
     <Transition name="modal">
       <div v-if="isEditing" class="modal-overlay" @click="cancelEditing">
@@ -450,6 +604,9 @@ const handleEditSubmit = async () => {
 </template>
 
 <style scoped>
+.margin-top-16 {
+  margin-top: 16px;
+}
 .user-space {
   max-width: 1200px;
   margin: 0 auto;

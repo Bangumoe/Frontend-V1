@@ -243,6 +243,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, watchEffect, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { API_BASE_URL } from '@/api/config'; // 假设 API_BASE_URL 在这里
+import { authApi } from '@/api/auth'; // 假设 authApi 有 getToken 方法
 import axios from 'axios'
 import TorrentPlayer from '@/components/TorrentPlayer.vue'
 import { Play, Star, PlayOne, Heart } from '@icon-park/vue-next';
@@ -683,6 +685,17 @@ const selectEpisodeHandler = (episode: Episode) => {
 const playSelectedEpisode = () => {
   if (selectedEpisode.value) {
     activeTorrentUrl.value = selectedEpisode.value.url;
+    const token = authApi.getToken();
+    if (token) { // 若已登录则记录历史记录
+      const rawData = {
+        url: activeTorrentUrl.value
+      }
+      fetch(`${API_BASE_URL}/api/v1/history/play_history`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(rawData)
+      });
+    }
   }
 };
 
