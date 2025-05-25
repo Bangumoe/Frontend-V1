@@ -50,6 +50,9 @@ export default defineConfig(({ mode }) => {
     },
     
     server: {
+      allowedHosts: [
+        'mi.jamyido.cn'
+      ],
       proxy: {
         '/api': {
           target: env.VITE_API_BASE_URL,
