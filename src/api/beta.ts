@@ -1,15 +1,16 @@
 import request from '@/utils/request'
+import { API_BASE_URL } from '@/api/config'
 
 export const getBetaStatus = () => {
   return request({
-    url: '/api/v1/beta/status',
+    url: `${API_BASE_URL}/api/v1/beta/status`,
     method: 'get'
   })
 }
 
 export const getUserInfo = () => {
   return request({
-    url: '/api/v1/user/info',
+    url: `${API_BASE_URL}/api/v1/user/info`,
     method: 'get'
   })
 } 

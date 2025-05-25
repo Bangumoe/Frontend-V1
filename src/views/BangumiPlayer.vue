@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import TorrentPlayer from '@/components/TorrentPlayer.vue'
 import StatusHint from '@/components/StatusHint.vue'
+import { API_BASE_URL } from '@/api/config' 
 
 // TypeScript 接口定义 - 剧集列表相关
 interface Episode {
@@ -131,7 +132,7 @@ const fetchBangumiData = async (id: string) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await axios.get<GroupedApiResponse>(`/api/v1/bangumi/grouped_items/${id}`, {
+    const response = await axios.get<GroupedApiResponse>(`${API_BASE_URL}/api/v1/bangumi/grouped_items/${id}`, {
       headers: headers
     })
     if (response.data.code === 200 && response.data.data) {
@@ -173,7 +174,7 @@ const fetchBangumiDetails = async (id: string) => {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await axios.get<BangumiDetailApiResponse>(`/api/v1/bangumi/${id}`, { headers });
+    const response = await axios.get<BangumiDetailApiResponse>(`${API_BASE_URL}/api/v1/bangumi/${id}`, { headers });
     if (response.data.code === 200 && response.data.data) {
       bangumiDetails.value = response.data.data;
       if (bangumiDetails.value && bangumiDetails.value.official_title) {
@@ -209,7 +210,7 @@ const fetchBangumiStats = async (id: string) => {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await axios.get<BangumiStatsApiResponse>(`/api/v1/bangumi/${id}/stats`, { headers });
+    const response = await axios.get<BangumiStatsApiResponse>(`${API_BASE_URL}/api/v1/bangumi/${id}/stats`, { headers });
     if (response.data.code === 200 && response.data.data) {
       bangumiStats.value = response.data.data;
     } else {
@@ -325,7 +326,7 @@ const pageInitialLoading = computed(() => {
   <div class="bangumi-player-page">
     <!-- Page Level Loading/Error/Empty States -->
     <StatusHint v-if="pageInitialLoading && !episodesError && !detailsError" type="loading" title="少女祈祷中..." sub="正在加载番剧资源，请稍候" />
-    <StatusHint v-else-if="(episodesError || detailsError) && (!groupedEpisodesData.length && !bangumiDetails)" type="error" :title="'加载失败'" :sub="episodesError || detailsError">
+    <StatusHint v-else-if="(episodesError || detailsError) && (!groupedEpisodesData.length && !bangumiDetails)" type="error" :title="'加载失败'" :sub="episodesError || detailsError || undefined">
       <div class="status-sub">请检查网络连接或番剧ID是否正确。</div>
     </StatusHint>
     <StatusHint v-else-if="!pageInitialLoading && !groupedEpisodesData.length && !bangumiDetails && !episodesError && !detailsError" type="empty" title="暂无番剧信息" sub="抱歉，该番剧暂无任何信息~" />

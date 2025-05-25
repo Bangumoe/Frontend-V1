@@ -412,7 +412,7 @@ const fetchBangumiDetails = async (id: string) => {
   try {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const response = await axios.get<BangumiDetailApiResponse>(`/api/v1/bangumi/${id}`, { headers });
+    const response = await axios.get<BangumiDetailApiResponse>(`${API_BASE_URL}/api/v1/bangumi/${id}`, { headers });
     if (response.data.code === 200 && response.data.data) {
       bangumiDetails.value = response.data.data;
     } else {
@@ -448,7 +448,7 @@ const fetchGroupedEpisodes = async (id: string) => {
   try {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const response = await axios.get<GroupedApiResponse>(`/api/v1/bangumi/grouped_items/${id}`, { headers });
+    const response = await axios.get<GroupedApiResponse>(`${API_BASE_URL}/api/v1/bangumi/grouped_items/${id}`, { headers });
     if (response.data.code === 200 && response.data.data) {
       groupedEpisodesData.value = response.data.data;
       if (groupedEpisodesData.value.length > 0 && !selectedGroup.value) {
@@ -487,7 +487,7 @@ const fetchBangumiStats = async (id: string) => {
   try {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const response = await axios.get<BangumiStatsApiResponse>(`/api/v1/bangumi/${id}/stats`, { headers });
+    const response = await axios.get<BangumiStatsApiResponse>(`${API_BASE_URL}/api/v1/bangumi/${id}/stats`, { headers });
     if (response.data.code === 200 && response.data.data) {
       bangumiStats.value = response.data.data;
     } else {
@@ -529,7 +529,7 @@ const toggleFavorite = async () => {
     
     const headers = { 'Authorization': `Bearer ${token}` };
     const response = await axios.post<BangumiFavoriteApiResponse>(
-      `/api/v1/bangumi/${bangumiId.value}/favorite`,
+      `${API_BASE_URL}/api/v1/bangumi/${bangumiId.value}/favorite`,
       {},
       { headers }
     );

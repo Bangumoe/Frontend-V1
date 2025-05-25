@@ -65,7 +65,7 @@ const fetchRankings = async () => {
   error.value = null
   try {
     // 传递较大 pageSize，确保获取全部数据
-    const response = await bangumiApi.getBangumiRankings(1, 1000)
+    const response = await bangumiApi.getBangumiRankings(1, 24)
     if (response.code === 200 && response.data) {
       rankings.value = response.data
       // Wait for DOM update before calculating sizes

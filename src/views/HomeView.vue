@@ -7,6 +7,7 @@ import axios from 'axios'
 import { authApi } from '@/api/auth'
 import { useRouter } from 'vue-router'
 import StatusHint from '@/components/StatusHint.vue'
+import {API_BASE_URL} from '@/api/config'
 
 // 轮播图数据
 const carouselItems = ref<{
@@ -20,17 +21,23 @@ const carouselItems = ref<{
 // 获取轮播图数据
 const fetchCarousels = async () => {
   try {
-    const response = await axios.get('/api/v1/carousels')
-    carouselItems.value = response.data.map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      subtitle: item.subtitle,
-      image: item.image_url.startsWith('http') 
-        ? item.image_url  
-        : `${import.meta.env.VITE_API_BASE_URL}${item.image_url}`,
-      link: item.link,
-      is_active: item.is_active
-    }))
+    const response = await axios.get(`${API_BASE_URL}/api/v1/carousels`)
+    // 检查 response.data 是否为数组
+    if (Array.isArray(response.data)) {
+      carouselItems.value = response.data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        subtitle: item.subtitle,
+        image: item.image_url.startsWith('http')
+          ? item.image_url
+          : `${import.meta.env.VITE_API_BASE_URL}${item.image_url}`,
+        link: item.link,
+        is_active: item.is_active
+      }))
+    } else {
+      console.error('获取轮播图数据失败: 返回数据不是数组', response.data);
+      carouselItems.value = []; // 清空轮播图数据，避免渲染错误
+    }
   } catch (error) {
     console.error('获取轮播图数据失败:', error)
   }

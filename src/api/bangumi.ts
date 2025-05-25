@@ -32,7 +32,7 @@ export const bangumiApi = {
 
   // 获取所有年份列表
   getBangumiYears: async (): Promise<ApiResponse<string[]>> => {
-    return await apiRequest.get('/api/v1/bangumi/years')
+    return await apiRequest.get(`/api/v1/bangumi/years`)
   },
 
   // 获取番剧详情

@@ -54,12 +54,6 @@ export default defineConfig(({ mode }) => {
         'mi.jamyido.cn'
       ],
       proxy: {
-        '/api': {
-          target: env.VITE_API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path
-        },
         '/mikan': {
           target: env.VITE_MIKAN_BASE_URL,
           changeOrigin: true,
