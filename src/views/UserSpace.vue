@@ -473,7 +473,7 @@ const handleEditSubmit = async () => {
       <!-- 正常状态 -->
       <div v-else class="favorites-grid">
         <div v-for="bangumi in historyList" :key="bangumi.id" class="bangumi-card">
-          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.url}`" class="bangumi-link">
+          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.episode}`" class="bangumi-link">
             <div class="bangumi-cover" :ref="el => setPosterRef(el, bangumi)">
               <img :src="posterUrls[bangumi.id] || '/default-poster.png'" :alt="bangumi.title"
                 @error="(e: Event) => (e.target as HTMLImageElement).src = '/default-poster.png'" />
