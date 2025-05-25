@@ -85,7 +85,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-// 在全局CSS文件中添加变量定义
+/* 在全局CSS文件中添加变量定义*/
 :root {
   --bg: #ffffff;
   --primary-color: #3f51b5;

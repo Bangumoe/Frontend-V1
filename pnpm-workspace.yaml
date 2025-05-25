@@ -1,0 +1,8 @@
+onlyBuiltDependencies:
+  - bufferutil
+  - esbuild
+  - node-datachannel
+  - protobufjs
+  - utf-8-validate
+  - utp-native
+  - vue-demi

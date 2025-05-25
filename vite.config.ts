@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue' // 确保正确导入 vue 插件
 import vueDevTools from 'vite-plugin-vue-devtools'
 
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
@@ -26,7 +27,7 @@ export default defineConfig(({ mode }) => {
         'os': 'os-browserify',
         'process': 'process/browser',
         'util': 'util',
-        //'global': 'global' // 确保 global 别名已正确配置
+        'global': 'global' // 确保 global 别名已正确配置
       },
       
     },
@@ -44,7 +45,7 @@ export default defineConfig(({ mode }) => {
         'os-browserify',
         'process/browser',
         'util',
-        //'global' // 确保 global 被包含在优化依赖中
+        'global' // 确保 global 被包含在优化依赖中
       ]
     },
     
