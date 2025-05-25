@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import axios from 'axios'
+import { TORRENT_API_BASE_URL } from '@/api/config';
 
 // --- Helper Types/Interfaces ---
 // REMOVED EpisodeInfo interface as it's no longer used
@@ -67,7 +68,7 @@ const convertTorrentToMagnetIfNeeded = async (url: string): Promise<string> => {
     return url
   }
   try {
-    const response = await axios.post('/torrent-api/parse', { url })
+    const response = await axios.post(`${TORRENT_API_BASE_URL}/api/v1/torrent/parse`, { url })
     if (response.data && response.data.magnet) {
       return response.data.magnet
     }
@@ -102,19 +103,19 @@ const initPlayer = async (url: string) => {
   try {
     const oldSessionId = sessionId.value;
     if (oldSessionId) {
-      axios.delete(`/torrent-api/${oldSessionId}`).catch(err => console.warn('Failed to cleanup old session:', err));
+      axios.delete(`${TORRENT_API_BASE_URL}/api/v1/torrent/${oldSessionId}`).catch(err => console.warn('Failed to cleanup old session:', err));
     }
     sessionId.value = ''; 
 
     const magnet = await convertTorrentToMagnetIfNeeded(url);
-    const addResponse = await axios.post('/torrent-api/add', { magnet });
+    const addResponse = await axios.post(`${TORRENT_API_BASE_URL}/api/v1/torrent/add`, { magnet });
 
     if (addResponse.data && addResponse.data.sessionId) {
       sessionId.value = addResponse.data.sessionId;
       
       await new Promise(resolve => setTimeout(resolve, 1500)); 
 
-      const filesResponse = await axios.get(`/torrent-api/${sessionId.value}`);
+      const filesResponse = await axios.get(`${TORRENT_API_BASE_URL}/api/v1/torrent/${sessionId.value}`);
       if (filesResponse.data && Array.isArray(filesResponse.data)) {
         const videosInCurrentTorrent = filesResponse.data
           .filter((file: any) => file && file.name && typeof file.index === 'number' && 
@@ -123,7 +124,7 @@ const initPlayer = async (url: string) => {
         
         if (videosInCurrentTorrent.length > 0) {
           const videoToPlay = videosInCurrentTorrent.sort((a,b) => a.name.localeCompare(b.name))[0];
-          videoUrl.value = `/torrent-api/${sessionId.value}/stream/${videoToPlay.index}`;
+          videoUrl.value = `${TORRENT_API_BASE_URL}/api/v1/torrent/${sessionId.value}/stream/${videoToPlay.index}`;
           if (videoPlayer.value) {
              nextTick(() => {
                 if(videoPlayer.value) {
@@ -347,7 +348,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscKey); 
   if (controlsTimeout.value) clearTimeout(controlsTimeout.value)
   if (sessionId.value) {
-    axios.delete(`/torrent-api/${sessionId.value}`).catch(err => console.warn('Failed to cleanup session on unmount:', err))
+    axios.delete(`${TORRENT_API_BASE_URL}/api/v1/torrent/${sessionId.value}`).catch(err => console.warn('Failed to cleanup session on unmount:', err))
     sessionId.value = '';
   }
 })

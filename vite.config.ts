@@ -60,12 +60,6 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (path) => path.replace(/^\/mikan/, '')
         },
-        '/torrent-api': {
-          target: env.VITE_TORRENT_API_BASE_URL,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/torrent-api/, '/api/v1/torrent')
-        }
       }
     }
   }
