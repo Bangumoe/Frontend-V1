@@ -94,25 +94,22 @@ router.beforeEach(async (to, from, next) => {
   console.log(`Navigating from ${from.path} to: ${to.path}`);
 
   const betaStore = useBetaStore();
-  // Fetch beta status only if not already checked or if navigating to a relevant path that might depend on it.
-  // The store itself now has an early exit if hasChecked is true.
   const { isBetaMode, isAllowed: userHasBetaAccess } = await betaStore.checkBetaStatus();
   console.log(`Beta Mode: ${isBetaMode}, User Beta Access: ${userHasBetaAccess}`);
 
-  const tokenExists = authApi.getToken(); // Synchronous check
+  const tokenExists = authApi.getToken(); 
   let isTokenValid = false;
   if (tokenExists) {
-      // Perform token validation only if a token exists. 
-      // This result will be used for decisions below.
       isTokenValid = await authApi.checkToken(); 
       console.log(`Token validation result: ${isTokenValid}`);
   }
 
-  // 1. Beta Mode: Register page restriction (highest priority)
-  if (isBetaMode && to.path === '/register') {
-    console.log('Router: Beta mode, /register access forbidden. Redirecting to /login.');
-    return next({ path: '/login', query: { message: 'beta_register_forbidden' } });
-  }
+  // 1. Beta Mode: Register page restriction (REMOVED/MODIFIED)
+  // No longer redirecting from /register in beta mode, as invitation code will be used.
+  // if (isBetaMode && to.path === '/register') {
+  //   console.log('Router: Beta mode, /register access forbidden. Redirecting to /login.');
+  //   return next({ path: '/login', query: { message: 'beta_register_forbidden' } });
+  // }
 
   // 2. Beta Mode: Access to /no-beta-access page
   if (to.path === '/no-beta-access') {
@@ -121,12 +118,12 @@ router.beforeEach(async (to, from, next) => {
       return next('/');
     }
     console.log('Router: Beta mode, no access. Allowing navigation to /no-beta-access.');
-    return next(); // Allow access to /no-beta-access if in beta and no access
+    return next(); 
   }
 
-  // 3. Beta Mode: General restriction for users without access
-  if (isBetaMode && !userHasBetaAccess && to.path !== '/login') { // Allow login page
-    console.log('Router: Beta mode, no access. Redirecting to /no-beta-access.');
+  // 3. Beta Mode: General restriction for users without access (excluding /register now)
+  if (isBetaMode && !userHasBetaAccess && to.path !== '/login' && to.path !== '/register') { 
+    console.log('Router: Beta mode, no access (and not login/register). Redirecting to /no-beta-access.');
     return next('/no-beta-access');
   }
 
@@ -138,14 +135,15 @@ router.beforeEach(async (to, from, next) => {
       return next();
     } else {
       console.log('Router: Route requires auth, token invalid or missing. Redirecting to /login via handleTokenExpiration.');
-      authApi.handleTokenExpiration(); // This should handle redirection to login
-      return next(false); // Cancel current navigation, allow handleTokenExpiration to redirect
+      authApi.handleTokenExpiration(); 
+      return next(false); 
     }
   }
 
   // 5. Handling authenticated users trying to access /login or /register
-  if ((to.path === '/login' || to.path === '/register') && isTokenValid) {
-    console.log('Router: Authenticated user trying to access public auth page. Redirecting to /.');
+  // If user is valid and on /register, let them be (they might be viewing it for other reasons, or beta mode logic handles it)
+  if (to.path === '/login' && isTokenValid) { 
+    console.log('Router: Authenticated user trying to access login page. Redirecting to /.');
     return next('/');
   }
   

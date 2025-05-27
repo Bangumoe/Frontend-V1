@@ -1,19 +1,34 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi } from '@/api/auth'
+import { useBetaStore } from '@/stores/beta'
 
 const router = useRouter()
+const betaStore = useBetaStore()
+
 const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const email = ref('')
+const invitationCode = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
+
+const isBetaModeActive = computed(() => betaStore.isBetaMode)
+
+onMounted(async () => {
+  await betaStore.checkBetaStatus()
+})
 
 const validateForm = () => {
   if (!username.value || !password.value || !confirmPassword.value || !email.value) {
     errorMsg.value = '请填写所有必填项'
+    return false
+  }
+
+  if (isBetaModeActive.value && !invitationCode.value) {
+    errorMsg.value = '内测模式下，邀请码为必填项'
     return false
   }
 
@@ -35,20 +50,28 @@ const handleRegister = async () => {
 
   try {
     loading.value = true
-    const response = await authApi.register({
-      username: username.value,
-      password: password.value,
-      confirmPassword: confirmPassword.value,
-      email: email.value
-    })
+    errorMsg.value = ''
+
+    const formData = new FormData()
+    formData.append('username', username.value)
+    formData.append('password', password.value)
+    formData.append('email', email.value)
+    formData.append('role', 'regular')
+
+    if (isBetaModeActive.value && invitationCode.value) {
+      formData.append('invitation_code', invitationCode.value)
+    }
+
+    const response = await authApi.register(formData)
     
     if (response.success) {
+      console.log('Registration successful, user:', response.user)
       router.push('/login')
     } else {
       errorMsg.value = response.message || '注册失败'
     }
-  } catch (error) {
-    errorMsg.value = '网络错误，请稍后重试'
+  } catch (error: any) {
+    errorMsg.value = error.message || '网络错误，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -80,6 +103,17 @@ const handleRegister = async () => {
             type="email"
             placeholder="请输入邮箱"
             required
+          />
+        </div>
+
+        <div v-if="isBetaModeActive" class="form-group">
+          <label for="invitationCode">邀请码</label>
+          <input
+            id="invitationCode"
+            v-model="invitationCode"
+            type="text"
+            placeholder="请输入邀请码"
+            :required="isBetaModeActive"
           />
         </div>
 

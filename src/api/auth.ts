@@ -14,9 +14,13 @@ interface LoginData {
   password: string
 }
 
-interface RegisterData extends LoginData {
-  email: string
-  confirmPassword: string
+interface RegisterData {
+  username: string;
+  password: string;
+  email: string;
+  role: string;
+  invitation_code?: string;
+  avatar?: File;
 }
 
 interface AuthResponse {
@@ -126,14 +130,11 @@ export const authApi = {
     }
   },
   
-  register: async (data: RegisterData): Promise<AuthResponse> => {
+  register: async (data: FormData): Promise<AuthResponse> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
+        body: data
       })
 
       const result = await response.json()
