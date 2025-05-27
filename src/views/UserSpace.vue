@@ -70,6 +70,19 @@ const posterRefs = ref<{ [key: number]: HTMLElement | null }>({});
 
 import type { ComponentPublicInstance } from 'vue';
 
+// Debounce function
+function debounce<T extends (...args: any[]) => any>(func: T, delay: number): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  return function(this: ThisParameterType<T>, ...args: Parameters<T>) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func.apply(this, args);
+    }, delay);
+  };
+}
+
 const setPosterRef = (el: Element | ComponentPublicInstance | null, bangumi: Bangumi) => {
   if (el && el instanceof HTMLElement) {
     posterRefs.value[bangumi.id] = el as HTMLElement;
@@ -117,8 +130,10 @@ const getPosterUrl = (cover: string) => {
 };
 
 // 监听窗口大小变化
+const debouncedUpdatePosterUrls = debounce(updatePosterUrls, 300); // 300ms debounce
 const handleResize = () => {
-  updatePosterUrls();
+  // updatePosterUrls(); // 直接调用改为调用debounce后的版本
+  debouncedUpdatePosterUrls();
 };
 
 const fetchUserInfo = async () => {
@@ -403,7 +418,7 @@ const handleEditSubmit = async () => {
       <!-- 正常状态 -->
       <div v-else class="favorites-grid">
         <div v-for="bangumi in favoritesList" :key="bangumi.id" class="bangumi-card">
-          <router-link :to="`/v2/bangumi/${bangumi.id}`" class="bangumi-link">
+          <router-link :to="`/v2/bangumi/${bangumi.id}`" class="bangumi-link" target="_blank">
             <div class="bangumi-cover" :ref="el => setPosterRef(el, bangumi)">
               <img
                 :src="posterUrls[bangumi.id] || '/default-poster.png'"
@@ -473,7 +488,7 @@ const handleEditSubmit = async () => {
       <!-- 正常状态 -->
       <div v-else class="favorites-grid">
         <div v-for="bangumi in historyList" :key="bangumi.id" class="bangumi-card">
-          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.episode}`" class="bangumi-link">
+          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.episode}`" target="_blank" class="bangumi-link">
             <div class="bangumi-cover" :ref="el => setPosterRef(el, bangumi)">
               <img :src="posterUrls[bangumi.id] || '/default-poster.png'" :alt="bangumi.title"
                 @error="(e: Event) => (e.target as HTMLImageElement).src = '/default-poster.png'" />
@@ -504,13 +519,13 @@ const handleEditSubmit = async () => {
 
       <!-- 分页控件 -->
       <div v-if="paginationD.totalPages > 1" class="pagination">
-        <button :disabled="paginationD.page <= 1" @click="handlePageChange(paginationD.page - 1)" class="page-btn">
+        <button :disabled="paginationD.page <= 1" @click="handlePageChangeD(paginationD.page - 1)" class="page-btn">
           上一页
         </button>
         <span class="page-info">
           {{ paginationD.page }} / {{ paginationD.totalPages }}
         </span>
-        <button :disabled="paginationD.page >= paginationD.totalPages" @click="handlePageChange(paginationD.page + 1)"
+        <button :disabled="paginationD.page >= paginationD.totalPages" @click="handlePageChangeD(paginationD.page + 1)"
           class="page-btn">
           下一页
         </button>

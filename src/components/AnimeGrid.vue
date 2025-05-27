@@ -32,6 +32,7 @@
         :key="anime.ID"
         :to="`/v2/bangumi/${anime.ID}`"
         class="anime-card"
+        target="_blank"
       >
         <div class="poster-container" :ref="el => { if (el) posterRefs[index] = el as HTMLElement }">
           <img

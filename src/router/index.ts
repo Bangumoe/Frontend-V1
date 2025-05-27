@@ -1,15 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authApi } from '@/api/auth'
 import HomeView from '../views/HomeView.vue'
-import AboutView from "@/views/AboutView.vue";
 import AnimeList from "@/views/AnimeList.vue";
 import LoginView from "@/views/LoginView.vue";
 import RegisterView from "@/views/RegisterView.vue";
-import UserProfile from "@/views/UserProfile.vue";
 import RankingView from "@/views/RankingView.vue";
-import BangumiPlayer from "@/views/BangumiPlayer.vue";
 import PlayerViewV2 from "@/views/PlayerView-V2.vue";
-import UserFavorites from "@/views/UserFavorites.vue";
 import UserSpace from "@/views/UserSpace.vue";
 import { useBetaStore } from '@/stores/beta'
 import SearchView from "@/views/SearchView.vue";
@@ -23,12 +19,6 @@ const routes = [
     name: 'home',
     component: HomeView,
     meta: { title: '首页' + '   |   ' + title }
-  },
-  {
-    path: '/about',
-    name: 'about',
-    component: AboutView,
-    meta: { title: '关于我们' + '   |   ' + title }
   },
   {
     path: '/anime',
@@ -55,26 +45,6 @@ const routes = [
     meta: { title: '注册' + '   |   ' + title  }
   },
   {
-    path: '/user/profile',
-    name: 'user-profile',
-    component: UserProfile,
-    meta: { title: '用户中心' + '   |   ' + title  },
-    children: [
-      {
-        path: 'favorites',
-        name: 'userFavorites',
-        component: UserFavorites,
-        meta: { title: '我的收藏' + '   |   ' + title }
-      },
-      {
-         path: '',
-         name: 'userProfileOverview',
-         component: { template: '<div>用户概览内容 (待添加)</div>' },
-         meta: { title: '用户概览' + '   |   ' + title }
-      }
-    ]
-  },
-  {
     path: '/torrent-test',
     name: 'TorrentTest',
     component: () => import('@/views/TorrentTest.vue'),
@@ -85,12 +55,6 @@ const routes = [
     name: 'rankings',
     component: RankingView,
     meta: { title: '番剧排行榜' + '   |   ' + title }
-  },
-  {
-    path: '/bangumi/:id', // :id 将是番剧的ID
-    name: 'BangumiPlayer',
-    component: () => import('@/views/BangumiPlayer.vue'),
-    meta: { title: '番剧播放' + '   |   ' + title }
   },
   {
     path: '/v2/bangumi/:id',
@@ -125,90 +89,71 @@ const router = createRouter({
   routes
 })
 
-// 全局路由守卫
 router.beforeEach(async (to, from, next) => {
-  // 检查是否是直接访问（不是通过点击链接）
-  const isDirectAccess = !from.name;
-  
-  // 如果不是直接访问，则在新标签页中打开
-  if (!isDirectAccess) {
-    shouldUpdateTitle = false; // 阻止标题更新
-    window.open(to.fullPath, '_blank');
-    next(false); // 阻止当前导航
-    return;
-  } else {
-    shouldUpdateTitle = true; // 允许标题更新
+  shouldUpdateTitle = true;
+  console.log(`Navigating from ${from.path} to: ${to.path}`);
+
+  const betaStore = useBetaStore();
+  // Fetch beta status only if not already checked or if navigating to a relevant path that might depend on it.
+  // The store itself now has an early exit if hasChecked is true.
+  const { isBetaMode, isAllowed: userHasBetaAccess } = await betaStore.checkBetaStatus();
+  console.log(`Beta Mode: ${isBetaMode}, User Beta Access: ${userHasBetaAccess}`);
+
+  const tokenExists = authApi.getToken(); // Synchronous check
+  let isTokenValid = false;
+  if (tokenExists) {
+      // Perform token validation only if a token exists. 
+      // This result will be used for decisions below.
+      isTokenValid = await authApi.checkToken(); 
+      console.log(`Token validation result: ${isTokenValid}`);
   }
 
-  console.log(`Navigating to: ${to.path}`)
-  const betaStore = useBetaStore()
-  const { isBetaMode, isAllowed } = await betaStore.checkBetaStatus()
-  console.log(`Beta Mode (from checkStatus return): ${isBetaMode}, Is Allowed (from checkStatus return): ${isAllowed}`)
-
-  // **优先处理内测模式下对注册页的访问**
+  // 1. Beta Mode: Register page restriction (highest priority)
   if (isBetaMode && to.path === '/register') {
-    console.log('Beta mode active, restricting register access.')
-    next({ path: '/login', query: { message: 'beta_register_forbidden' } })
-    return
+    console.log('Router: Beta mode, /register access forbidden. Redirecting to /login.');
+    return next({ path: '/login', query: { message: 'beta_register_forbidden' } });
   }
 
-  // 内测模式且无资格，且目标不是无资格页面或登录页，则重定向
-  if (isBetaMode && !isAllowed && to.path !== '/no-beta-access' && to.path !== '/login') {
-     console.log('Beta mode active and not allowed, redirecting to no-beta-access.')
-    next('/no-beta-access')
-    return
+  // 2. Beta Mode: Access to /no-beta-access page
+  if (to.path === '/no-beta-access') {
+    if (!isBetaMode || userHasBetaAccess) {
+      console.log('Router: Not in beta or user has access. Redirecting from /no-beta-access to /.');
+      return next('/');
+    }
+    console.log('Router: Beta mode, no access. Allowing navigation to /no-beta-access.');
+    return next(); // Allow access to /no-beta-access if in beta and no access
   }
 
-  // 如果目标是无资格页面，但内测模式关闭或用户有资格，则跳回首页
-  if (to.path === '/no-beta-access' && (!isBetaMode || isAllowed)) {
-     console.log('Beta mode inactive or allowed, redirecting from no-beta-access.')
-    next('/')
-    return
+  // 3. Beta Mode: General restriction for users without access
+  if (isBetaMode && !userHasBetaAccess && to.path !== '/login') { // Allow login page
+    console.log('Router: Beta mode, no access. Redirecting to /no-beta-access.');
+    return next('/no-beta-access');
   }
 
-  // 现有的认证逻辑
+  // 4. Authentication for routes that require it
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-  const tokenExists = authApi.isAuthenticated(); // 快速检查 token 是否存在
-
   if (requiresAuth) {
-    if (tokenExists) {
-      const isTokenValid = await authApi.checkToken(); // 验证 token 有效性
-      if (isTokenValid) {
-        next(); // Token 有效，继续导航
-      } else {
-        // Token 无效或已过期.
-        // authApi.checkToken() 内部的 handleTokenExpiration 应该已经开始处理重定向。
-        // 我们需要取消当前的导航，以允许 handleTokenExpiration 中的 router.replace 生效。
-        console.log('Router guard: Token invalid after check, cancelling navigation.');
-        next(false); 
-      }
+    if (isTokenValid) {
+      console.log('Router: Route requires auth, token is valid. Proceeding.');
+      return next();
     } else {
-      // Token 不存在，按统一逻辑处理，它会重定向到登录页
-      console.log('Router guard: Token does not exist, handling expiration.');
-      authApi.handleTokenExpiration(); 
-      next(false); // 取消当前导航，让 handleTokenExpiration 中的重定先生效
-    }
-  } else {
-    // 对于不需要认证的路由 (e.g., /login, /register, /about)
-    // 如果用户已认证 (token 存在且有效) 且尝试访问登录/注册页，则重定向到首页
-    // 注意：内测模式下注册页访问已在前面处理
-    if ((to.name === 'login' || to.name === 'register') && tokenExists) {
-        const isTokenValid = await authApi.checkToken();
-        if (isTokenValid) {
-            console.log('Router guard: Authenticated user trying to access login/register, redirecting to home.');
-            next({ path: '/' });
-        } else {
-            // Token 存在但无效，允许访问登录/注册页 (因为 handleTokenExpiration 应该已被 checkToken 调用)
-            console.log('Router guard: User with invalid token trying to access login/register, allowing.');
-            next();
-        }
-    } else {
-      next(); //不需要认证，或者已认证用户访问非登录/注册的公开页面
+      console.log('Router: Route requires auth, token invalid or missing. Redirecting to /login via handleTokenExpiration.');
+      authApi.handleTokenExpiration(); // This should handle redirection to login
+      return next(false); // Cancel current navigation, allow handleTokenExpiration to redirect
     }
   }
+
+  // 5. Handling authenticated users trying to access /login or /register
+  if ((to.path === '/login' || to.path === '/register') && isTokenValid) {
+    console.log('Router: Authenticated user trying to access public auth page. Redirecting to /.');
+    return next('/');
+  }
+  
+  // 6. Default: If none of the above, allow navigation
+  console.log('Router: No specific rules matched or auth not required. Proceeding.');
+  next();
 });
 
-// 恢复 afterEach 守卫，确保标题只在 afterEach 里更新
 router.afterEach((to) => {
   if (shouldUpdateTitle) {
     if (to.meta && to.meta.title) {

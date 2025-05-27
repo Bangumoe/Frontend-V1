@@ -160,7 +160,7 @@ watch(myBangumis, () => {
     <section class="my-bangumi-section">
       <div class="section-header">
         <h2 class="section-title">我追的番剧</h2>
-        <router-link to="/space" class="view-more">全部
+        <router-link to="/space" class="view-more" target="_blank">全部
           <Right />
         </router-link>
       </div>
@@ -169,7 +169,7 @@ watch(myBangumis, () => {
       <div v-else-if="myBangumis.length === 0" class="my-bangumi-status"><StatusHint type="empty" title="暂无收藏" sub="你还没有追番，快去收藏喜欢的番剧吧~" /></div>
       <div v-else class="my-bangumi-scroll">
         <div class="my-bangumi-list">
-          <router-link v-for="bangumi in myBangumis" :key="bangumi.id" :to="`/v2/bangumi/${bangumi.id}`" class="my-bangumi-card bangumi-card">
+          <router-link v-for="bangumi in myBangumis" :key="bangumi.id" :to="`/v2/bangumi/${bangumi.id}`" target="_blank" class="my-bangumi-card bangumi-card">
             <div class="my-bangumi-poster-container bangumi-cover" :ref="el => setMyPosterRef(el, bangumi)">
               <img
                 :src="myPosterUrls[bangumi.id] || '/default-poster.png'"
@@ -213,7 +213,7 @@ watch(myBangumis, () => {
     <section class="years-section">
       <div class="section-header">
         <h2 class="section-title">年份浏览</h2>
-        <router-link to="/anime" class="view-more">
+        <router-link to="/anime" class="view-more" target="_blank">
           查看更多
           <Right />
         </router-link>
@@ -224,6 +224,7 @@ watch(myBangumis, () => {
           :key="year"
           :to="`/anime/year/${year}`"
           class="year-item"
+          target="_blank"
           :class="{ 'current-year': year === currentYear }"
         >
           <div class="year-content">

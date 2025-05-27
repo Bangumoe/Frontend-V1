@@ -51,15 +51,9 @@ watch(isAuthenticated, async (newValue) => {
   if (newValue) {
     await fetchUserInfo()
   } else {
-    userInfo.value = null // Token 清除后，用户信息也应清除
-    // 以下的重定向逻辑已由全局路由守卫和 handleTokenExpiration 处理
-    // if (router.currentRoute.value.meta.requiresAuth) {
-    //   router.push('/login')
-    // }
+    userInfo.value = null
   }
 })
-
-
 
 const handleLogout = () => {
   showUserMenu.value = false // 可选：立即关闭菜单
@@ -69,53 +63,37 @@ const handleLogout = () => {
 
 const fetchUserInfo = async () => {
   try {
-    // 增加一个检查，以防在异步流程中 token 意外消失
     const tokenStillExists = authApi.getToken()
     if (!tokenStillExists) {
       console.warn("fetchUserInfo (App.vue): Token disappeared before fetching. Aborting.")
-      // 如果 token 已不存在，isAuthenticated 会变为 false，其 watcher 会处理 userInfo.value = null
-      // authApi.handleTokenExpiration() // 不必重复调用，路由守卫或API请求的401会处理
+      userInfo.value = null
       return
     }
 
-    const info = await authApi.getUserInfo() // 这个调用如果401，会被config.ts中的拦截器处理
+    // 如果已经有用户信息且 token 存在，则不需要重新获取
+    if (userInfo.value && tokenStillExists) {
+      return
+    }
+
+    const info = await authApi.getUserInfo()
     if (info) {
       userInfo.value = {
         username: info.username,
         avatar: info.avatar && info.avatar.startsWith('http')
           ? info.avatar
-          // 确保 API_BASE_URL 存在且头像路径正确拼接
           : info.avatar ? `${import.meta.env.VITE_API_BASE_URL || ''}${info.avatar.startsWith('/') ? '' : '/'}${info.avatar}` : ''
       }
     } else {
-      // API 调用成功但未返回有效用户信息，或者 getUserInfo 返回 null
       userInfo.value = null
     }
-  } catch (error: any) {
-    // ApiRequest 中的 401 错误已由拦截器处理 (调用 handleTokenExpiration)
-    // 此处捕获的是其他类型的错误，如网络问题或服务器5xx错误
-    // 或者 authApi.getUserInfo 内部在 fetch 前就抛出的 "未登录" 错误 (如果 token 检查更早)
-    console.error('获取用户信息失败 (App.vue catch):', error.message)
-    // 如果错误明确表示未授权或token问题（非我们主动抛出的 'Unauthorized:...'），
-    // 理论上应该已被拦截器或 checkToken 处理。
-    // 为安全起见，如果到这里 userInfo 还有值，可以清除。
-    // userInfo.value = null
-    // 注意：如果 getUserInfo 因为 localStorage.getItem('token') 为空而直接抛错"未登录"，
-    // 那么 isAuthenticated 应该已经是 false，其 watcher 会处理 userInfo.value。
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    userInfo.value = null
   }
 }
 
-// 监听路由变化,每次路由切换时检查登录状态
-watch(
-  () => route.path,
-  async () => {
-    if (isAuthenticated.value) {
-      await fetchUserInfo()
-    }
-  }
-)
-
 onMounted(async () => {
+  // 只在有 token 时获取用户信息
   if (isAuthenticated.value) {
     await fetchUserInfo()
   }
@@ -143,7 +121,7 @@ const handleSearchEnter = (e: KeyboardEvent) => {
             <img src="@/assets/logo-1000x1000.png" alt="Bangumoe Logo" />
           </div>
           <nav class="main-nav">
-            <RouterLink to="/" :class="['nav-item', { active: isNavActive('/') }]">
+            <RouterLink to="/" :class="['nav-item', { active: isNavActive('/') }]" target="_blank">
               <Home class="nav-icon-park" theme="outline" size="20" :strokeColor="'var(--nav-text-color)'"/>
               <span>首页</span>
             </RouterLink>
@@ -151,11 +129,11 @@ const handleSearchEnter = (e: KeyboardEvent) => {
               <PlayTwo class="nav-icon-park" theme="outline" size="20" :strokeColor="'var(--nav-text-color)'"/>
               <span>BT播放器</span>
             </RouterLink>-->
-            <RouterLink to="/anime" :class="['nav-item', { active: isNavActive('/anime') }]">
+            <RouterLink to="/anime" :class="['nav-item', { active: isNavActive('/anime') }]" target="_blank">
               <VideoOne class="nav-icon-park" theme="outline" size="20" :strokeColor="'var(--nav-text-color)'"/>
               <span>番剧</span>
             </RouterLink>
-            <RouterLink to="/rankings" :class="['nav-item', { active: isNavActive('/rankings') }]">
+            <RouterLink to="/rankings" :class="['nav-item', { active: isNavActive('/rankings') }]" target="_blank">
               <Ranking class="nav-icon-park" theme="outline" size="20" :strokeColor="'var(--nav-text-color)'"/>
               <span>排行榜</span>
             </RouterLink>
@@ -180,7 +158,7 @@ const handleSearchEnter = (e: KeyboardEvent) => {
                 <User v-else theme="outline" size="20" fill="#666"/> 
               </div>
               <div v-show="showUserMenu" class="dropdown-menu" @mouseenter="openMenu" @mouseleave="startHideMenuTimer">
-                <RouterLink to="/space" class="menu-item">
+                <RouterLink to="/space" class="menu-item" target="_blank">
                   <User theme="outline" size="16" class="menu-icon-park"/>
                   <span>个人空间</span>
                 </RouterLink>
@@ -192,7 +170,7 @@ const handleSearchEnter = (e: KeyboardEvent) => {
             </div>
           </template>
           <template v-else>
-            <RouterLink to="/login" class="login-btn">登录</RouterLink>
+            <RouterLink to="/login" class="login-btn" target="_blank">登录</RouterLink>
           </template>
         </div>
       </div>

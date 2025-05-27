@@ -152,7 +152,7 @@ const scrollRight = () => {
   <section class="popular-section">
     <div class="section-header">
       <h2 class="section-title">热门推荐</h2>
-      <RouterLink to="/rankings" class="view-more">
+      <RouterLink to="/rankings" class="view-more" target="_blank">
         查看更多
         <Right />
       </RouterLink>
@@ -188,6 +188,7 @@ const scrollRight = () => {
           :key="bangumi.ID"
           :to="`/v2/bangumi/${bangumi.ID}`"
           class="bangumi-card"
+          target="_blank"
         >
           <div class="poster-container" :ref="el => { if (el) posterRefs[index] = el as HTMLElement }">
             <img

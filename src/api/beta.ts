@@ -6,11 +6,4 @@ export const getBetaStatus = () => {
     url: `${API_BASE_URL}/api/v1/beta/status`,
     method: 'get'
   })
-}
-
-export const getUserInfo = () => {
-  return request({
-    url: `${API_BASE_URL}/api/v1/user/info`,
-    method: 'get'
-  })
 } 

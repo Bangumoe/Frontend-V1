@@ -4,6 +4,10 @@ import { ref, readonly } from 'vue'
 
 // 内部响应式状态，从 localStorage 初始化
 const _isAuthenticated = ref(!!localStorage.getItem('token'))
+// 用户信息缓存
+const _userInfoCache = ref<UserInfo | null>(null);
+// 进行中的 getUserInfo 请求的 Promise
+let _userInfoRequestPromise: Promise<UserInfo | null> | null = null;
 
 interface LoginData {
   username: string
@@ -36,6 +40,7 @@ interface UserInfo {
   updated_at: string
   favorite_count: number
   comment_count: number
+  is_allowed?: boolean;
 }
 
 interface UpdateUserInfoData {
@@ -54,10 +59,12 @@ interface UpdateUserInfoResponse {
 export const authApi = {
   // 提供一个响应式的只读状态供外部使用
   isAuthenticatedReactive: readonly(_isAuthenticated),
+  // 提供一个响应式的只读用户缓存信息供外部使用
+  userInfoReactive: readonly(_userInfoCache),
 
   login: async (data: LoginData): Promise<AuthResponse> => {
     try {
-      console.log('发送登录请求:', `${API_BASE_URL}/api/v1/login`)
+      console.log('[AuthAPI] Attempting login with:', data.username);
       const response = await fetch(`${API_BASE_URL}/api/v1/login`, {
         method: 'POST',
         headers: {
@@ -67,19 +74,38 @@ export const authApi = {
       })
 
       const result = await response.json()
-      console.log('登录响应结果:', result)
+      console.log('[AuthAPI] Login response from server:', result);
 
       if (!response.ok) {
+        console.error('[AuthAPI] Login failed. Server response not OK:', response.status, result.message);
         throw new Error(result.message || '登录失败')
       }
 
-      if (result.token) { // 确保后端返回了token
-        localStorage.setItem('token', result.token)
-        _isAuthenticated.value = true // 更新响应式状态
+      if (result.token) {
+        console.log('[AuthAPI] Token received from server:', result.token);
+        localStorage.setItem('token', result.token);
+        // 验证 token 是否真的存入了 localStorage
+        const storedToken = localStorage.getItem('token');
+        if (storedToken === result.token) {
+          console.log('[AuthAPI] Token successfully stored in localStorage.');
+          _isAuthenticated.value = true;
+          _userInfoCache.value = result.user || null;
+          _userInfoRequestPromise = null; // 清除旧的 promise，新的用户会话
+          console.log('[AuthAPI] _isAuthenticated set to true, userInfoCache updated, requestPromise cleared.');
+        } else {
+          console.error('[AuthAPI] CRITICAL: Failed to store token in localStorage or token mismatch!');
+          _isAuthenticated.value = false; // 确保状态正确
+          _userInfoCache.value = null;
+          _userInfoRequestPromise = null; // 登录失败也清除
+          // 可以考虑抛出错误，因为这是一个严重问题
+          throw new Error('无法在localStorage中存储认证token');
+        }
       } else {
-        // 如果后端没有返回token，也应该视为登录失败的一种情况
-        console.error('登录成功但未收到Token')
-        throw new Error('登录成功但未收到Token')
+        console.error('[AuthAPI] Login successful but no token received from server.');
+        _isAuthenticated.value = false; // 确保状态正确
+        _userInfoCache.value = null;
+        _userInfoRequestPromise = null; // 登录失败也清除
+        throw new Error('登录成功但未收到Token');
       }
 
       return {
@@ -89,8 +115,10 @@ export const authApi = {
         message: '登录成功'
       }
     } catch (error) {
-      console.error('登录错误:', error)
+      console.error('[AuthAPI] Login error (catch block):', error);
       _isAuthenticated.value = false // 登录失败，确保状态为 false
+      _userInfoCache.value = null;
+      _userInfoRequestPromise = null; // 登录失败也清除
       return {
         success: false,
         message: error instanceof Error ? error.message : '网络错误'
@@ -128,41 +156,77 @@ export const authApi = {
   },
 
   getUserInfo: async (): Promise<UserInfo | null> => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        if (_isAuthenticated.value) _isAuthenticated.value = false // 同步状态
-        throw new Error('未登录')
-      }
-      // 如果 _isAuthenticated 是 false 但 localStorage 有 token（不太可能，但为了健壮性）
-      if (!_isAuthenticated.value) _isAuthenticated.value = true
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/user/info`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          // localStorage.removeItem('token') // handleTokenExpiration会做
-          authApi.handleTokenExpiration() // 调用统一处理，它会更新 _isAuthenticated
-        }
-        throw new Error('获取用户信息失败')
-      }
-
-      const result = await response.json()
-      return result.data
-    } catch (error: any) {
-      console.error('获取用户信息错误:', error)
-      throw new Error(error.message || '获取用户信息失败')
+    const token = localStorage.getItem('token');
+    if (!token) {
+      if (_isAuthenticated.value) _isAuthenticated.value = false;
+      if (_userInfoCache.value) _userInfoCache.value = null;
+      _userInfoRequestPromise = null; // Token 不存在，清除 promise
+      return null;
     }
+
+    if (_isAuthenticated.value && _userInfoCache.value) {
+      console.log('[AuthAPI] getUserInfo: Returning from direct cache.');
+      return _userInfoCache.value;
+    }
+
+    if (_userInfoRequestPromise) {
+      console.log('[AuthAPI] getUserInfo: Waiting for existing in-flight request.');
+      return _userInfoRequestPromise;
+    }
+
+    console.log('[AuthAPI] getUserInfo: Initiating new user info request.');
+    _userInfoRequestPromise = (async () => {
+      try {
+        const currentToken = localStorage.getItem('token'); // 再次检查 token
+        if (!currentToken) {
+            console.warn('[AuthAPI] getUserInfo (in-flight): Token disappeared before fetch.');
+            if (_isAuthenticated.value) _isAuthenticated.value = false;
+            if (_userInfoCache.value) _userInfoCache.value = null;
+            return null;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/v1/user/info`, {
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+
+        if (!response.ok) {
+          console.warn(`[AuthAPI] getUserInfo (in-flight): Request failed with status ${response.status}`);
+          if (response.status === 401) { // Token 无效
+            if (_isAuthenticated.value) _isAuthenticated.value = false;
+          }
+          _userInfoCache.value = null; 
+          return null;
+        }
+
+        const result = await response.json();
+        if (!result.data) {
+          console.warn('[AuthAPI] getUserInfo (in-flight): No data in response, though request was OK.');
+          _userInfoCache.value = null; 
+          return null;
+        }
+        
+        console.log('[AuthAPI] getUserInfo (in-flight): Fetched and cached user info.');
+        if (!_isAuthenticated.value) _isAuthenticated.value = true;
+        _userInfoCache.value = result.data;
+        return result.data;
+      } catch (error) {
+        console.error('[AuthAPI] getUserInfo (in-flight) CATCH block error:', error);
+        if (_isAuthenticated.value) _isAuthenticated.value = false; 
+        _userInfoCache.value = null;
+        return null;
+      } finally {
+        _userInfoRequestPromise = null; // 请求结束后清除 promise
+      }
+    })();
+    return _userInfoRequestPromise;
   },
 
   logout: () => {
-    localStorage.removeItem('token')
-    _isAuthenticated.value = false // 更新响应式状态
-    // Pinia store 清理等逻辑（如果需要）
+    console.trace('[AuthAPI] logout() called');
+    localStorage.removeItem('token');
+    _isAuthenticated.value = false;
+    _userInfoCache.value = null;
+    _userInfoRequestPromise = null; // 登出时清除 promise
   },
 
   getToken: () => {
@@ -176,47 +240,55 @@ export const authApi = {
   },
 
   checkToken: async (): Promise<boolean> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token');
     if (!token) {
-      if (_isAuthenticated.value) _isAuthenticated.value = false // 同步状态
-      return false
+      if (_isAuthenticated.value) _isAuthenticated.value = false;
+      if (_userInfoCache.value) _userInfoCache.value = null;
+      return false;
     }
 
     try {
+      console.log('[AuthAPI] checkToken: Performing validation request.');
       const response = await fetch(`${API_BASE_URL}/api/v1/user/info`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
       if (!response.ok) {
+        console.warn(`[AuthAPI] checkToken: Validation failed with status ${response.status}`);
         if (response.status === 401) {
-          console.warn('Token check failed (401), handling expiration.')
-          authApi.handleTokenExpiration() // 会调用 logout, 更新 _isAuthenticated
-        } else {
-          // 其他错误，例如服务器问题，不一定意味着token无效。
-          // 但如果之前认为是认证的，现在检查失败，可能需要重新评估。
-          // 暂时不改变 _isAuthenticated，依赖调用者和后续流程。
+          if (_isAuthenticated.value) _isAuthenticated.value = false;
         }
-        return false
+        if (_userInfoCache.value) _userInfoCache.value = null;
+        return false;
       }
-      // Token 有效
-      if (!_isAuthenticated.value) _isAuthenticated.value = true // 如果之前是false，现在更新为true
-      return true
+      
+      const result = await response.json();
+      console.log('[AuthAPI] checkToken: Validation successful.');
+      if (!_isAuthenticated.value) _isAuthenticated.value = true;
+      
+      if (result.data) {
+        _userInfoCache.value = result.data;
+        console.log('[AuthAPI] checkToken: User info cache updated from validation.');
+      } else {
+        console.warn('[AuthAPI] checkToken: Token valid, but no user data in response.');
+        _userInfoCache.value = null;
+      }
+      return true;
     } catch (error) {
-      console.error('Token 检查失败 (catch block): ', error)
-      // 网络错误，不直接判断token无效，但如果依赖此检查进行认证，则返回false
-      // 也不改变 _isAuthenticated 的状态，因为可能是临时网络问题
-      return false
+      console.error('[AuthAPI] checkToken CATCH block error:', error);
+      if (_isAuthenticated.value) _isAuthenticated.value = false;
+      if (_userInfoCache.value) _userInfoCache.value = null;
+      return false;
     }
   },
 
   handleTokenExpiration: () => {
+    console.trace('[AuthAPI] handleTokenExpiration() called');
     const currentPath = router.currentRoute.value.fullPath
     const currentRouteName = router.currentRoute.value.name
 
     console.log('Handling token expiration. Current path:', currentPath)
-    authApi.logout()
+    authApi.logout() // logout 内部会清除 token 和 _userInfoCache
 
     if (currentRouteName !== 'login' && currentRouteName !== 'register') {
       router.replace({
@@ -276,3 +348,9 @@ export const authApi = {
 // （虽然 ref 初始化时已经做了，这里是双重保障或明确意图）
 // _isAuthenticated.value = !!localStorage.getItem('token');
 // 注释掉，因为 ref 初始化时已经执行了。
+// 应用启动时，可以尝试根据 token 状态预加载用户信息
+// if (_isAuthenticated.value && !_userInfoCache.value) {
+//   authApi.getUserInfo(); 
+// }
+// 注释掉：让 getUserInfo 在首次被调用时按需加载，避免应用启动时不必要的请求。
+// login 成功后会填充，checkToken 成功后也会填充。
