@@ -1,14 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authApi } from '@/api/auth'
-import HomeView from '../views/HomeView.vue'
-import AnimeList from "@/views/AnimeList.vue";
-import LoginView from "@/views/LoginView.vue";
-import RegisterView from "@/views/RegisterView.vue";
-import RankingView from "@/views/RankingView.vue";
-import PlayerViewV2 from "@/views/PlayerView-V2.vue";
-import UserSpace from "@/views/UserSpace.vue";
 import { useBetaStore } from '@/stores/beta'
-import SearchView from "@/views/SearchView.vue";
 
 var title = '咪次元~Bangumoe！';
 let shouldUpdateTitle = true;
@@ -17,31 +9,31 @@ const routes = [
   {
     path: '/',
     name: 'home',
-    component: HomeView,
+    component: () => import('../views/HomeView.vue'),
     meta: { title: '首页' + '   |   ' + title }
   },
   {
     path: '/anime',
     name: 'anime',
-    component: AnimeList,
+    component: () => import('@/views/AnimeList.vue'),
     meta: { title: '番剧列表' + '   |   ' + title  }
   },
   {
     path: '/anime/year/:year',
     name: 'anime-detail',
-    component: AnimeList,
+    component: () => import('@/views/AnimeList.vue'),
     meta: { title: '番剧详情' + '   |   ' + title   }
   },
   {
     path: '/login',
     name: 'login',
-    component: LoginView,
+    component: () => import('@/views/LoginView.vue'),
     meta: { title: '登录' + '   |   ' + title }
   },
   {
     path: '/register',
     name: 'register',
-    component: RegisterView,
+    component: () => import('@/views/RegisterView.vue'),
     meta: { title: '注册' + '   |   ' + title  }
   },
   {
@@ -53,7 +45,7 @@ const routes = [
   {
     path: '/rankings',
     name: 'rankings',
-    component: RankingView,
+    component: () => import('@/views/RankingView.vue'),
     meta: { title: '番剧排行榜' + '   |   ' + title }
   },
   {
@@ -70,13 +62,13 @@ const routes = [
   {
     path: '/search',
     name: 'search',
-    component: SearchView,
+    component: () => import('@/views/SearchView.vue'),
     meta: { title: '搜索结果   |   咪次元~Bangumoe！' }
   },
   {
     path: '/space',
     name: 'user-space',
-    component: UserSpace,
+    component: () => import('@/views/UserSpace.vue'),
     meta: { 
       title: '个人空间' + '   |   ' + title,
       requiresAuth: true 
