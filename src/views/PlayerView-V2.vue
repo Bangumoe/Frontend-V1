@@ -247,7 +247,7 @@ import { API_BASE_URL } from '@/api/config'; // 假设 API_BASE_URL 在这里
 import { authApi } from '@/api/auth'; // 假设 authApi 有 getToken 方法
 import axios from 'axios'
 import TorrentPlayer from '@/components/TorrentPlayer.vue'
-import { Play, Star, PlayOne, Heart } from '@icon-park/vue-next';
+import { Play, Star, PlayOne, Like } from '@icon-park/vue-next';
 
 // --- TypeScript 接口定义 --- 
 interface Episode {

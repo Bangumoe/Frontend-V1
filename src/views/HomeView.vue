@@ -8,6 +8,7 @@ import { authApi } from '@/api/auth'
 import { useRouter } from 'vue-router'
 import StatusHint from '@/components/StatusHint.vue'
 import {API_BASE_URL} from '@/api/config'
+import { Right, PlayOne, Star, Play, Like } from '@icon-park/vue-next';
 
 // 轮播图数据
 const carouselItems = ref<{

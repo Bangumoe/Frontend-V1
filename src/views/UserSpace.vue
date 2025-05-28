@@ -86,8 +86,8 @@ function debounce<T extends (...args: any[]) => any>(func: T, delay: number): (.
 const setPosterRef = (el: Element | ComponentPublicInstance | null, bangumi: Bangumi) => {
   if (el && el instanceof HTMLElement) {
     posterRefs.value[bangumi.id] = el as HTMLElement;
-    // 当元素被设置时立即更新其 URL
-    updatePosterUrl(bangumi);
+    // Remove immediate update to prevent excessive processing during render
+    // updatePosterUrl(bangumi);
   }
 };
 
@@ -106,13 +106,28 @@ const updatePosterUrl = (bangumi: Bangumi) => {
 
 // 更新所有海报的 URL
 const updatePosterUrls = () => {
+  if (favoritesList.value.length === 0) return;
+  
   nextTick(() => {
     favoritesList.value.forEach((bangumi) => {
       updatePosterUrl(bangumi);
     });
   });
 };
+
+/**
+ * 更新历史记录中的海报URL
+ * 
+ * 如果历史记录列表为空则直接返回，否则在下一个tick中批量更新所有条目的海报URL。
+ * 该函数主要处理用户空间页面的历史观看记录海报加载优化。
+ */
 const updatePosterUrlsD = () => {
+  if (historyList.value.length === 0) return;
+
+  /**
+   * 在DOM更新后执行海报URL更新操作
+   * 遍历历史记录列表并逐个更新海报URL
+   */
   nextTick(() => {
     historyList.value.forEach((bangumi) => {
       updatePosterUrl(bangumi);
@@ -266,15 +281,24 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  // 清理对象以防止内存泄漏
+  Object.keys(posterUrls).forEach((key) => {
+    delete posterUrls[parseInt(key)];
+  });
+  posterRefs.value = {};
 });
 
 // 监听收藏列表变化
 watch(favoritesList, () => {
-  nextTick(updatePosterUrls);
-});
+  // 使用防抖动来防止多次快速更新
+  debouncedUpdatePosterUrls();
+}, { deep: false }); // 只观察数组本身，而不观察其内容
+
 watch(historyList, () => {
-  nextTick(updatePosterUrlsD);
-});
+  // 创建updatePosterUrlsD的防抖动版本
+  const debouncedUpdatePosterUrlsD = debounce(updatePosterUrlsD, 300);
+  debouncedUpdatePosterUrlsD();
+}, { deep: false }); // 只观察数组本身，而不观察其内容
 
 // 添加编辑相关的状态
 const isEditing = ref(false);

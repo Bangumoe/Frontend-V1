@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <AsyncElDialog
     v-model="visible"
     title="内测模式提示"
     width="30%"
@@ -12,12 +12,20 @@
       <el-icon class="beta-icon"><InfoFilled /></el-icon>
       <p>当前网站处于内测模式，部分功能可能不稳定</p>
     </div>
-  </el-dialog>
+  </AsyncElDialog>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
+import { ElDialog } from 'element-plus' // 显式导入 ElDialog 以供 defineAsyncComponent 使用
+
+// 定义异步 ElDialog
+const AsyncElDialog = defineAsyncComponent(() => 
+  Promise.resolve(ElDialog)
+  // 或者更保险的写法，如果ElDialog没有正确导出或被tree-shaking:
+  // import('element-plus/es/components/dialog/index').then(module => module.ElDialog)
+);
 
 const visible = ref(false)
 const BETA_NOTICE_KEY = 'beta_notice_last_shown'

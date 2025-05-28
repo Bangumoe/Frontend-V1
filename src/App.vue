@@ -5,6 +5,7 @@ import { authApi } from '@/api/auth'
 import { useBetaStore } from '@/stores/beta'
 import BetaNotice from '@/components/BetaNotice.vue'
 // import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // REMOVED
+import { Home, VideoOne, Ranking, Search, User, Logout } from '@icon-park/vue-next';
 
 
 const router = useRouter()
