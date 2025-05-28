@@ -7,7 +7,7 @@
       status="warning"
     >
       <template #extra>
-        <el-button type="primary" @click="goBack">返回首页</el-button>
+        <el-button type="primary" @click="goregister">拿到邀请码了？去注册！</el-button>
       </template>
     </el-result>
   </div>
@@ -18,8 +18,8 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const goBack = () => {
-  router.push('/')
+const goregister = () => {
+  router.push('/register')
 }
 </script>
 
