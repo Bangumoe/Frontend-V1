@@ -73,7 +73,19 @@ const routes = [
       title: '个人空间' + '   |   ' + title,
       requiresAuth: true 
     }
-  }
+  },
+  {
+    path: '/privacy-policy',
+    name: 'PrivacyPolicy',
+    component: () => import('@/views/PrivacyPolicy.vue'),
+    meta: { title: '隐私政策   |   咪次元~Bangumoe！' }
+  },
+  {
+    path: '/terms-of-service',
+    name: 'TermsOfService',
+    component: () => import('@/views/TermsOfService.vue'),
+    meta: { title: '服务条款   |   咪次元~Bangumoe！' }
+  },
 ];
 
 const router = createRouter({
@@ -114,8 +126,9 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // 3. Beta Mode: General restriction for users without access (excluding /register now)
-  if (isBetaMode && !userHasBetaAccess && to.path !== '/login' && to.path !== '/register') { 
-    console.log('Router: Beta mode, no access (and not login/register). Redirecting to /no-beta-access.');
+  const betaWhitelist = ['/login', '/register', '/privacy-policy', '/terms-of-service'];
+  if (isBetaMode && !userHasBetaAccess && !betaWhitelist.includes(to.path)) { 
+    console.log('Router: Beta mode, no access (and not in whitelist). Redirecting to /no-beta-access.');
     return next('/no-beta-access');
   }
 

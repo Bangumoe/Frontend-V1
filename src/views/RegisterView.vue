@@ -14,6 +14,7 @@ const email = ref('')
 const invitationCode = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
+const agreeTerms = ref(false) // New ref for terms agreement
 
 const isBetaModeActive = computed(() => betaStore.isBetaMode)
 
@@ -42,6 +43,11 @@ const validateForm = () => {
     return false
   }
 
+  if (!agreeTerms.value) {
+    errorMsg.value = '请阅读并同意用户协议和保密协议'
+    return false
+  }
+  
   return true
 }
 
@@ -137,6 +143,21 @@ const handleRegister = async () => {
             placeholder="请再次输入密码"
             required
           />
+        </div>
+
+        <div class="terms-agree">
+          <input
+            id="agreeTerms"
+            v-model="agreeTerms"
+            type="checkbox"
+            required
+          />
+          <label for="agreeTerms" class="terms-label">
+            我已阅读并同意
+            <router-link to="/privacy-policy">内测用户保密协议</router-link>
+            和
+            <router-link to="/terms-of-service">用户使用协议条款</router-link>
+          </label>
         </div>
 
         <div v-if="errorMsg" class="error-message">
@@ -256,4 +277,26 @@ const handleRegister = async () => {
 .login-link:hover {
   text-decoration: underline;
 }
-</style> 
+
+.terms-agree {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.terms-label {
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.terms-label a {
+  color: var(--primary-color);
+  text-decoration: none;
+  margin: 0 4px;
+}
+
+.terms-label a:hover {
+  text-decoration: underline;
+}
+</style>
