@@ -29,7 +29,6 @@ interface Bangumi {
 
 interface History extends Bangumi {
   episode: number;
-  history_id: number;
   history_time: string;
 }
 
@@ -63,6 +62,34 @@ const paginationD = ref({
   totalPages: 0
 });
 const route = useRoute();
+const hoveredCardId = ref<number | null>(null);
+async function deleteCard(bangumiId: number) {
+
+  const token = authApi.getToken();
+  if (!token) {
+    historyList.value = historyList.value.filter(card => card.id !== bangumiId);
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/history/${bangumiId}/play_history`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }
+  );
+
+  const result = await response.json()
+
+  if (response.ok) {
+    historyList.value = historyList.value.filter(card => card.id !== bangumiId);
+  } else {
+    console.error('[HistoryAPI] Delete play history. Server response Failed:', response.status, result.message);
+    throw new Error(result.message || '删除失败')
+  }
+}
 
 // 添加动态海报URL的响应式对象
 const posterUrls = reactive<{ [key: number]: string }>({});
@@ -421,7 +448,7 @@ const handleEditSubmit = async () => {
     <!-- 收藏番剧列表 -->
     <div class="favorites-section">
       <h2 class="section-title">我的收藏</h2>
-      
+
       <!-- 加载状态 -->
       <div v-if="loading" class="page-status">
         <div class="loading-spinner"></div>
@@ -511,8 +538,10 @@ const handleEditSubmit = async () => {
 
       <!-- 正常状态 -->
       <div v-else class="favorites-grid">
-        <div v-for="bangumi in historyList" :key="bangumi.id" class="bangumi-card">
-          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.episode}`" target="_blank" class="bangumi-link">
+        <div v-for="bangumi in historyList" :key="bangumi.id" class="bangumi-card"
+          @mouseenter="hoveredCardId = bangumi.id" @mouseleave="hoveredCardId = null">
+          <router-link :to="`/v2/bangumi/${bangumi.id}?episode=${bangumi.episode}`" target="_blank"
+            class="bangumi-link">
             <div class="bangumi-cover" :ref="el => setPosterRef(el, bangumi)">
               <img :src="posterUrls[bangumi.id] || '/default-poster.png'" :alt="bangumi.title"
                 @error="(e: Event) => (e.target as HTMLImageElement).src = '/default-poster.png'" />
@@ -538,6 +567,9 @@ const handleEditSubmit = async () => {
               </p>
             </div>
           </router-link>
+          <button v-if="hoveredCardId === bangumi.id" class="delete-btn" @click="deleteCard(bangumi.id)">
+            &times;
+          </button>
         </div>
       </div>
 
@@ -889,6 +921,7 @@ const handleEditSubmit = async () => {
 .bangumi-cover {
   position: relative;
   padding-top: 140%;
+  margin-top: 10px;
   width: 100%;
   overflow: hidden;
 }
@@ -1260,5 +1293,20 @@ const handleEditSubmit = async () => {
     min-width: 60px;
     padding: 12px 10px 8px 10px;
   }
+}
+
+.delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: red;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 10;
 }
 </style>
